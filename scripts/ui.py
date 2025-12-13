@@ -5,6 +5,8 @@
 from __future__ import annotations
 
 import sys
+import logging
+import io
 from pathlib import Path
 
 # Add project root to path
@@ -18,7 +20,15 @@ import networkx as nx            # type: ignore
 from scripts.graph import build_graph
 from scripts.data import EXCHANGES
 from scripts.astar_vol import astar_best_path_with_liquidity, PlanResult, NodeId
+from scripts.h1_vol import volume_heuristic_cost
+from scripts.h2_slippage import slippage_heuristic_cost
 from typing import Optional
+
+# Set up logging to capture A* search logs
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(levelname)s: %(message)s'
+)
 
 
 # --------------------------------------------------------------
@@ -166,6 +176,7 @@ def run_search_and_format(
     start_wallet: str,
     liquid_cash: float,
     heuristic_name: str,
+    status_container=None,  # Streamlit container for real-time log updates
 ) -> str:
     """
     Run A* from the selected start node and return a human-readable report.
@@ -179,7 +190,52 @@ def run_search_and_format(
 
     start_node: NodeId = (ex, coin)
 
+    # Set up real-time logging to Streamlit if status_container provided
+    class StreamlitLogHandler(logging.Handler):
+        def __init__(self, container):
+            super().__init__()
+            self.container = container
+            self.log_lines = []
+        
+        def emit(self, record):
+            try:
+                msg = self.format(record)
+                self.log_lines.append(msg)
+                # Update the container with latest logs (keep last 10 lines)
+                if self.container:
+                    display_lines = self.log_lines[-10:]  # Show last 10 lines
+                    self.container.code('\n'.join(display_lines), language=None)
+            except Exception:
+                pass
+    
+    # Capture logging output for both file and Streamlit
+    log_capture = io.StringIO()
+    handler = logging.StreamHandler(log_capture)
+    handler.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(message)s')  # Simplified format
+    handler.setFormatter(formatter)
+    
+    # Get the logger for astar_vol module
+    astar_logger = logging.getLogger('scripts.astar_vol')
+    astar_logger.addHandler(handler)
+    astar_logger.setLevel(logging.INFO)
+    
+    # Add Streamlit handler if container provided
+    streamlit_handler = None
+    if status_container:
+        streamlit_handler = StreamlitLogHandler(status_container)
+        streamlit_handler.setLevel(logging.INFO)
+        streamlit_handler.setFormatter(logging.Formatter('%(message)s'))
+        astar_logger.addHandler(streamlit_handler)
+    
     try:
+        # Verify heuristic parameter is being passed correctly
+        if heuristic_name not in ["h1_liquidity", "h2_slippage"]:
+            if streamlit_handler:
+                astar_logger.removeHandler(streamlit_handler)
+            astar_logger.removeHandler(handler)
+            return f"Invalid heuristic: {heuristic_name}. Must be 'h1_liquidity' or 'h2_slippage'."
+        
         result: Optional[PlanResult] = astar_best_path_with_liquidity(
             start_node=start_node,
             liquid_cash_usd=liquid_cash,
@@ -188,7 +244,16 @@ def run_search_and_format(
             min_profit_usd=0.0,
             heuristic=heuristic_name,  # Pass selected heuristic to A*
         )
+        
+        # Clean up handlers
+        if streamlit_handler:
+            astar_logger.removeHandler(streamlit_handler)
+        astar_logger.removeHandler(handler)
+        
     except Exception as e:
+        if streamlit_handler:
+            astar_logger.removeHandler(streamlit_handler)
+        astar_logger.removeHandler(handler)
         return f"Error while running A* search: {e}"
 
     if result is None:
@@ -207,9 +272,57 @@ def run_search_and_format(
     lines.append(f"Final cash: {result.final_cash_usd:.2f} USD")
     lines.append(f"Profit: {result.profit_usd:.2f} USD ({profit_pct:.4f}%)")
     lines.append("")
+    
     lines.append("Route:")
     lines.append(f"  {route_str}")
     lines.append("")
+    
+    # Add heuristic debug section
+    lines.append("Heuristic Values (Debug):")
+    lines.append("-" * 60)
+    
+    # Calculate current cash at each step to show heuristic values
+    current_cash = liquid_cash
+    remaining_time = 1800.0  # max_time_sec from A* call
+    
+    for i, node in enumerate(result.path):
+        exchange, coin = node
+        # Calculate both heuristics for comparison
+        h1_val = volume_heuristic_cost(
+            exchange_name=exchange,
+            coin=coin,
+            order_notional_usd=current_cash,
+            remaining_time_sec=remaining_time,
+        )
+        h2_val = slippage_heuristic_cost(
+            exchange_name=exchange,
+            coin=coin,
+            order_size_usd=current_cash,
+            side="buy",  # Default side
+        )
+        
+        # Show which heuristic was used
+        used_val = h1_val if heuristic_name == "h1_liquidity" else h2_val
+        used_marker = "← USED" if heuristic_name == "h1_liquidity" else "← USED"
+        
+        lines.append(
+            f"  Step {i+1}: {exchange}:{coin}"
+        )
+        lines.append(
+            f"    h1_liquidity: {h1_val:.6f} {'← USED' if heuristic_name == 'h1_liquidity' else ''}"
+        )
+        lines.append(
+            f"    h2_slippage:  {h2_val:.6f} {'← USED' if heuristic_name == 'h2_slippage' else ''}"
+        )
+        if abs(h1_val - h2_val) > 0.0001:
+            diff = abs(h1_val - h2_val)
+            lines.append(f"    Difference: {diff:.6f} ⭐")
+        lines.append("")
+        
+        # Update current_cash for next iteration (simplified - actual would use edge costs)
+        # For display purposes, we'll just show the heuristic at the node
+        # The actual cash progression would require recalculating from edges
+    
     lines.append("Steps:")
 
     # One line per edge, showing chain for transfers
@@ -326,9 +439,19 @@ def main():
 
         # ---- Run button: only run A* when clicked ----
         if st.button("Run search"):
-            st.session_state["best_trade_text"] = run_search_and_format(
-                start_wallet, liquid_cash, heuristic
-            )
+            # Create a status container for real-time logging
+            with st.status("Running A* search...", expanded=True) as status:
+                # Create a code block for real-time log display
+                log_display = st.empty()
+                
+                # Run search with real-time logging
+                result_text = run_search_and_format(
+                    start_wallet, liquid_cash, heuristic, status_container=log_display
+                )
+                
+                # Update status when done
+                status.update(label="Search completed!", state="complete")
+                st.session_state["best_trade_text"] = result_text
 
         # Display the last result (or the initial message)
         st.text(st.session_state["best_trade_text"])
