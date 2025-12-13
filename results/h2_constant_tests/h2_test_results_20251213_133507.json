@@ -1,0 +1,277 @@
+{
+  "start_time": "2025-12-13T13:35:07.960712",
+  "test_parameters": {
+    "start_node": "binance:USDT",
+    "initial_capital_usd": 10000.0,
+    "max_depth": 6,
+    "max_time_sec": 1800.0,
+    "min_profit_usd": 0.0,
+    "batches": "all",
+    "parallel_execution": true,
+    "workers_per_batch": 3,
+    "total_configurations": 13
+  },
+  "test_configs": {
+    "baseline": {
+      "SLIPPAGE_HEURISTIC_WEIGHT": 0.5,
+      "SLIPPAGE_THRESHOLD_BPS": 10.0,
+      "UNKNOWN_SLIPPAGE_PENALTY": 50.0
+    },
+    "weight_low": {
+      "SLIPPAGE_HEURISTIC_WEIGHT": 0.1,
+      "SLIPPAGE_THRESHOLD_BPS": 10.0,
+      "UNKNOWN_SLIPPAGE_PENALTY": 50.0
+    },
+    "weight_medium": {
+      "SLIPPAGE_HEURISTIC_WEIGHT": 0.25,
+      "SLIPPAGE_THRESHOLD_BPS": 10.0,
+      "UNKNOWN_SLIPPAGE_PENALTY": 50.0
+    },
+    "weight_high": {
+      "SLIPPAGE_HEURISTIC_WEIGHT": 1.0,
+      "SLIPPAGE_THRESHOLD_BPS": 10.0,
+      "UNKNOWN_SLIPPAGE_PENALTY": 50.0
+    },
+    "weight_very_high": {
+      "SLIPPAGE_HEURISTIC_WEIGHT": 2.0,
+      "SLIPPAGE_THRESHOLD_BPS": 10.0,
+      "UNKNOWN_SLIPPAGE_PENALTY": 50.0
+    },
+    "threshold_low": {
+      "SLIPPAGE_HEURISTIC_WEIGHT": 0.5,
+      "SLIPPAGE_THRESHOLD_BPS": 5.0,
+      "UNKNOWN_SLIPPAGE_PENALTY": 50.0
+    },
+    "threshold_medium": {
+      "SLIPPAGE_HEURISTIC_WEIGHT": 0.5,
+      "SLIPPAGE_THRESHOLD_BPS": 20.0,
+      "UNKNOWN_SLIPPAGE_PENALTY": 50.0
+    },
+    "threshold_high": {
+      "SLIPPAGE_HEURISTIC_WEIGHT": 0.5,
+      "SLIPPAGE_THRESHOLD_BPS": 50.0,
+      "UNKNOWN_SLIPPAGE_PENALTY": 50.0
+    },
+    "penalty_low": {
+      "SLIPPAGE_HEURISTIC_WEIGHT": 0.5,
+      "SLIPPAGE_THRESHOLD_BPS": 10.0,
+      "UNKNOWN_SLIPPAGE_PENALTY": 10.0
+    },
+    "penalty_medium": {
+      "SLIPPAGE_HEURISTIC_WEIGHT": 0.5,
+      "SLIPPAGE_THRESHOLD_BPS": 10.0,
+      "UNKNOWN_SLIPPAGE_PENALTY": 25.0
+    },
+    "penalty_high": {
+      "SLIPPAGE_HEURISTIC_WEIGHT": 0.5,
+      "SLIPPAGE_THRESHOLD_BPS": 10.0,
+      "UNKNOWN_SLIPPAGE_PENALTY": 100.0
+    },
+    "aggressive": {
+      "SLIPPAGE_HEURISTIC_WEIGHT": 1.0,
+      "SLIPPAGE_THRESHOLD_BPS": 5.0,
+      "UNKNOWN_SLIPPAGE_PENALTY": 100.0
+    },
+    "conservative": {
+      "SLIPPAGE_HEURISTIC_WEIGHT": 0.25,
+      "SLIPPAGE_THRESHOLD_BPS": 20.0,
+      "UNKNOWN_SLIPPAGE_PENALTY": 25.0
+    }
+  },
+  "results": [
+    {
+      "config": "baseline",
+      "weight": 0.5,
+      "threshold": 10.0,
+      "penalty": 50.0,
+      "final_cash": 10041.955278727233,
+      "profit": 41.955278727233235,
+      "profit_pct": 0.41955278727233236,
+      "path_length": 3,
+      "path": "binance:USDT -> kucoin:USDT -> kucoin:TUSD",
+      "execution_time": 92.20842003822327,
+      "found": true,
+      "timestamp": "2025-12-13T13:36:40.177084"
+    },
+    {
+      "config": "weight_high",
+      "weight": 1.0,
+      "threshold": 10.0,
+      "penalty": 50.0,
+      "final_cash": 10041.955278727233,
+      "profit": 41.955278727233235,
+      "profit_pct": 0.41955278727233236,
+      "path_length": 3,
+      "path": "binance:USDT -> kucoin:USDT -> kucoin:TUSD",
+      "execution_time": 86.73809885978699,
+      "found": true,
+      "timestamp": "2025-12-13T13:38:06.920217"
+    },
+    {
+      "config": "weight_medium",
+      "weight": 0.25,
+      "threshold": 10.0,
+      "penalty": 50.0,
+      "final_cash": 10041.955278727233,
+      "profit": 41.955278727233235,
+      "profit_pct": 0.41955278727233236,
+      "path_length": 3,
+      "path": "binance:USDT -> kucoin:USDT -> kucoin:TUSD",
+      "execution_time": 90.41601276397705,
+      "found": true,
+      "timestamp": "2025-12-13T13:38:10.598029"
+    },
+    {
+      "config": "weight_low",
+      "weight": 0.1,
+      "threshold": 10.0,
+      "penalty": 50.0,
+      "final_cash": 10041.955278727233,
+      "profit": 41.955278727233235,
+      "profit_pct": 0.41955278727233236,
+      "path_length": 3,
+      "path": "binance:USDT -> kucoin:USDT -> kucoin:TUSD",
+      "execution_time": 91.40743780136108,
+      "found": true,
+      "timestamp": "2025-12-13T13:38:11.588021"
+    },
+    {
+      "config": "weight_very_high",
+      "weight": 2.0,
+      "threshold": 10.0,
+      "penalty": 50.0,
+      "final_cash": 10041.955278727233,
+      "profit": 41.955278727233235,
+      "profit_pct": 0.41955278727233236,
+      "path_length": 3,
+      "path": "binance:USDT -> kucoin:USDT -> kucoin:TUSD",
+      "execution_time": 83.81512999534607,
+      "found": true,
+      "timestamp": "2025-12-13T13:39:30.737536"
+    },
+    {
+      "config": "threshold_high",
+      "weight": 0.5,
+      "threshold": 50.0,
+      "penalty": 50.0,
+      "final_cash": 10041.955278727233,
+      "profit": 41.955278727233235,
+      "profit_pct": 0.41955278727233236,
+      "path_length": 3,
+      "path": "binance:USDT -> kucoin:USDT -> kucoin:TUSD",
+      "execution_time": 95.3156065940857,
+      "found": true,
+      "timestamp": "2025-12-13T13:41:06.060679"
+    },
+    {
+      "config": "threshold_low",
+      "weight": 0.5,
+      "threshold": 5.0,
+      "penalty": 50.0,
+      "final_cash": 10041.955278727233,
+      "profit": 41.955278727233235,
+      "profit_pct": 0.41955278727233236,
+      "path_length": 3,
+      "path": "binance:USDT -> kucoin:USDT -> kucoin:TUSD",
+      "execution_time": 97.57285690307617,
+      "found": true,
+      "timestamp": "2025-12-13T13:41:08.316164"
+    },
+    {
+      "config": "threshold_medium",
+      "weight": 0.5,
+      "threshold": 20.0,
+      "penalty": 50.0,
+      "final_cash": 10041.955278727233,
+      "profit": 41.955278727233235,
+      "profit_pct": 0.41955278727233236,
+      "path_length": 3,
+      "path": "binance:USDT -> kucoin:USDT -> kucoin:TUSD",
+      "execution_time": 102.64744019508362,
+      "found": true,
+      "timestamp": "2025-12-13T13:41:13.392069"
+    },
+    {
+      "config": "penalty_low",
+      "weight": 0.5,
+      "threshold": 10.0,
+      "penalty": 10.0,
+      "final_cash": 10041.955278727233,
+      "profit": 41.955278727233235,
+      "profit_pct": 0.41955278727233236,
+      "path_length": 3,
+      "path": "binance:USDT -> kucoin:USDT -> kucoin:TUSD",
+      "execution_time": 87.97962093353271,
+      "found": true,
+      "timestamp": "2025-12-13T13:42:41.377150"
+    },
+    {
+      "config": "penalty_medium",
+      "weight": 0.5,
+      "threshold": 10.0,
+      "penalty": 25.0,
+      "final_cash": 10041.955278727233,
+      "profit": 41.955278727233235,
+      "profit_pct": 0.41955278727233236,
+      "path_length": 3,
+      "path": "binance:USDT -> kucoin:USDT -> kucoin:TUSD",
+      "execution_time": 94.57624769210815,
+      "found": true,
+      "timestamp": "2025-12-13T13:42:47.975243"
+    },
+    {
+      "config": "penalty_high",
+      "weight": 0.5,
+      "threshold": 10.0,
+      "penalty": 100.0,
+      "final_cash": 10041.955278727233,
+      "profit": 41.955278727233235,
+      "profit_pct": 0.41955278727233236,
+      "path_length": 3,
+      "path": "binance:USDT -> kucoin:USDT -> kucoin:TUSD",
+      "execution_time": 95.29482913017273,
+      "found": true,
+      "timestamp": "2025-12-13T13:42:48.694902"
+    },
+    {
+      "config": "conservative",
+      "weight": 0.25,
+      "threshold": 20.0,
+      "penalty": 25.0,
+      "final_cash": 10041.955278727233,
+      "profit": 41.955278727233235,
+      "profit_pct": 0.41955278727233236,
+      "path_length": 3,
+      "path": "binance:USDT -> kucoin:USDT -> kucoin:TUSD",
+      "execution_time": 92.60846185684204,
+      "found": true,
+      "timestamp": "2025-12-13T13:44:21.309754"
+    },
+    {
+      "config": "aggressive",
+      "weight": 1.0,
+      "threshold": 5.0,
+      "penalty": 100.0,
+      "final_cash": 10041.955278727233,
+      "profit": 41.955278727233235,
+      "profit_pct": 0.41955278727233236,
+      "path_length": 3,
+      "path": "binance:USDT -> kucoin:USDT -> kucoin:TUSD",
+      "execution_time": 96.21903991699219,
+      "found": true,
+      "timestamp": "2025-12-13T13:44:24.919194"
+    }
+  ],
+  "batches_completed": [
+    "baseline",
+    "weights",
+    "thresholds",
+    "penalties",
+    "combined"
+  ],
+  "batches_pending": [],
+  "status": "completed",
+  "end_time": "2025-12-13T13:44:24.926134",
+  "total_configs": 13,
+  "successful_configs": 13
+}

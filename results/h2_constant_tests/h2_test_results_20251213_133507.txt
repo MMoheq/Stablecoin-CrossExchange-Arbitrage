@@ -1,0 +1,163 @@
+========================================================================================================================
+H2_SLIPPAGE CONSTANT TESTING - RESULTS LOG
+========================================================================================================================
+Start time: 2025-12-13T13:35:07.961465
+JSON log: /Users/user/Desktop/CMPT417/Stablecoin-CrossExchange-Arbitrage/results/h2_constant_tests/h2_test_results_20251213_133507.json
+
+TEST PARAMETERS:
+------------------------------------------------------------------------------------------------------------------------
+  start_node: binance:USDT
+  initial_capital_usd: 10000.0
+  max_depth: 6
+  max_time_sec: 1800.0
+  min_profit_usd: 0.0
+  batches: all
+  parallel_execution: True
+  workers_per_batch: 3
+  total_configurations: 13
+------------------------------------------------------------------------------------------------------------------------
+
+TEST CONFIGURATIONS:
+------------------------------------------------------------------------------------------------------------------------
+  Testing variations of h2_slippage constants:
+    - SLIPPAGE_HEURISTIC_WEIGHT (w_slip): Controls heuristic influence
+    - SLIPPAGE_THRESHOLD_BPS: Acceptable slippage threshold
+    - UNKNOWN_SLIPPAGE_PENALTY: Penalty when order book data unavailable
+------------------------------------------------------------------------------------------------------------------------
+
+
+============================================================
+Batch: baseline - Started at 2025-12-13T13:35:07.968140
+============================================================
+
+[2025-12-13T13:36:40.177084] Config: baseline
+  Weight: 0.5, Threshold: 10.0, Penalty: 50.0
+  ✓ Profit: $41.96 (0.4196%)
+  Path: binance:USDT -> kucoin:USDT -> kucoin:TUSD
+  Execution time: 92.21s
+
+
+Batch: baseline - Completed at 2025-12-13T13:36:40.179438
+============================================================
+
+============================================================
+Batch: weights - Started at 2025-12-13T13:36:40.179913
+============================================================
+
+[2025-12-13T13:38:06.920217] Config: weight_high
+  Weight: 1.0, Threshold: 10.0, Penalty: 50.0
+  ✓ Profit: $41.96 (0.4196%)
+  Path: binance:USDT -> kucoin:USDT -> kucoin:TUSD
+  Execution time: 86.74s
+
+
+[2025-12-13T13:38:10.598029] Config: weight_medium
+  Weight: 0.25, Threshold: 10.0, Penalty: 50.0
+  ✓ Profit: $41.96 (0.4196%)
+  Path: binance:USDT -> kucoin:USDT -> kucoin:TUSD
+  Execution time: 90.42s
+
+
+[2025-12-13T13:38:11.588021] Config: weight_low
+  Weight: 0.1, Threshold: 10.0, Penalty: 50.0
+  ✓ Profit: $41.96 (0.4196%)
+  Path: binance:USDT -> kucoin:USDT -> kucoin:TUSD
+  Execution time: 91.41s
+
+
+[2025-12-13T13:39:30.737536] Config: weight_very_high
+  Weight: 2.0, Threshold: 10.0, Penalty: 50.0
+  ✓ Profit: $41.96 (0.4196%)
+  Path: binance:USDT -> kucoin:USDT -> kucoin:TUSD
+  Execution time: 83.82s
+
+
+Batch: weights - Completed at 2025-12-13T13:39:30.741555
+============================================================
+
+============================================================
+Batch: thresholds - Started at 2025-12-13T13:39:30.742643
+============================================================
+
+[2025-12-13T13:41:06.060679] Config: threshold_high
+  Weight: 0.5, Threshold: 50.0, Penalty: 50.0
+  ✓ Profit: $41.96 (0.4196%)
+  Path: binance:USDT -> kucoin:USDT -> kucoin:TUSD
+  Execution time: 95.32s
+
+
+[2025-12-13T13:41:08.316164] Config: threshold_low
+  Weight: 0.5, Threshold: 5.0, Penalty: 50.0
+  ✓ Profit: $41.96 (0.4196%)
+  Path: binance:USDT -> kucoin:USDT -> kucoin:TUSD
+  Execution time: 97.57s
+
+
+[2025-12-13T13:41:13.392069] Config: threshold_medium
+  Weight: 0.5, Threshold: 20.0, Penalty: 50.0
+  ✓ Profit: $41.96 (0.4196%)
+  Path: binance:USDT -> kucoin:USDT -> kucoin:TUSD
+  Execution time: 102.65s
+
+
+Batch: thresholds - Completed at 2025-12-13T13:41:13.395379
+============================================================
+
+============================================================
+Batch: penalties - Started at 2025-12-13T13:41:13.396744
+============================================================
+
+[2025-12-13T13:42:41.377150] Config: penalty_low
+  Weight: 0.5, Threshold: 10.0, Penalty: 10.0
+  ✓ Profit: $41.96 (0.4196%)
+  Path: binance:USDT -> kucoin:USDT -> kucoin:TUSD
+  Execution time: 87.98s
+
+
+[2025-12-13T13:42:47.975243] Config: penalty_medium
+  Weight: 0.5, Threshold: 10.0, Penalty: 25.0
+  ✓ Profit: $41.96 (0.4196%)
+  Path: binance:USDT -> kucoin:USDT -> kucoin:TUSD
+  Execution time: 94.58s
+
+
+[2025-12-13T13:42:48.694902] Config: penalty_high
+  Weight: 0.5, Threshold: 10.0, Penalty: 100.0
+  ✓ Profit: $41.96 (0.4196%)
+  Path: binance:USDT -> kucoin:USDT -> kucoin:TUSD
+  Execution time: 95.29s
+
+
+Batch: penalties - Completed at 2025-12-13T13:42:48.698173
+============================================================
+
+============================================================
+Batch: combined - Started at 2025-12-13T13:42:48.699510
+============================================================
+
+[2025-12-13T13:44:21.309754] Config: conservative
+  Weight: 0.25, Threshold: 20.0, Penalty: 25.0
+  ✓ Profit: $41.96 (0.4196%)
+  Path: binance:USDT -> kucoin:USDT -> kucoin:TUSD
+  Execution time: 92.61s
+
+
+[2025-12-13T13:44:24.919194] Config: aggressive
+  Weight: 1.0, Threshold: 5.0, Penalty: 100.0
+  ✓ Profit: $41.96 (0.4196%)
+  Path: binance:USDT -> kucoin:USDT -> kucoin:TUSD
+  Execution time: 96.22s
+
+
+Batch: combined - Completed at 2025-12-13T13:44:24.925834
+============================================================
+
+========================================================================================================================
+TESTING COMPLETE
+========================================================================================================================
+End time: 2025-12-13T13:44:24.928571
+Total configs tested: 13
+Successful: 13
+Failed: 0
+Batches completed: baseline, weights, thresholds, penalties, combined
+
