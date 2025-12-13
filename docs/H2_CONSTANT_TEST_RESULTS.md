@@ -2,9 +2,11 @@
 
 ## Executive Summary
 
-This document presents the results of systematic testing of `h2_slippage` heuristic constants. We tested 13 different constant configurations to understand their impact on arbitrage path discovery and search efficiency.
+This document presents the results of systematic testing of `h2_slippage` heuristic constants. We tested 13 different constant configurations starting from `binance:USDT` with $10,000 initial capital to understand their impact on arbitrage path discovery and search efficiency.
 
 **Key Finding**: All constant variations converged to the same optimal path and profit, indicating that constants affect search efficiency but not optimality for this test scenario.
+
+**Testing Strategy**: See `docs/HEURISTIC_TESTING_STRATEGY.md` for the generalized testing methodology used.
 
 ---
 
