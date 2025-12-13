@@ -10,7 +10,8 @@ from math import exp
 from typing import Any, Dict, List, Optional, Tuple
 
 from scripts.graph import build_graph            
-from scripts.h1_vol import volume_heuristic_cost 
+from scripts.h1_vol import volume_heuristic_cost
+# h2_slippage imported conditionally when needed 
 
 
 # Node is ("binance", "USDT")
@@ -63,6 +64,7 @@ def astar_best_path_with_liquidity(
     max_depth: int = 6,
     max_time_sec: float = 1800.0,   # 30 minutes by default
     min_profit_usd: float = 0.0,
+    heuristic: str = "h1_liquidity",  # "h1_liquidity" or "h2_slippage"
 ) -> Optional[PlanResult]:
     """
     A* search over the arbitrage graph that:
@@ -71,7 +73,7 @@ def astar_best_path_with_liquidity(
       * Uses edge["rate"] / edge["cost"] from graph.py
         (these already encode spreads + taker/withdrawal fees).
       * Uses edge["transfer_time_sec"] for timing.
-      * Uses volume_heuristic_cost(...) to penalize illiquid markets.
+      * Uses selected heuristic (h1_liquidity or h2_slippage) to guide search.
       * Treats ANY reachable node as a potential destination where
         the trader does their last buy, then conceptually sells to USD.
       * Picks the path with the highest final USD value.
@@ -92,21 +94,30 @@ def astar_best_path_with_liquidity(
     #   (f_score, g_score, counter, SearchState, path_nodes, path_edges)
     #
     # g_score = sum(cost)    (cost = -log(rate), lower is better)
-    # h_score = volume_heuristic_cost(...)  (>= 0)
-    # f_score = g_score + h_score           (A* objective)
+    # h_score = selected heuristic (h1_liquidity or h2_slippage)
+    # f_score = g_score + h_score  (A* objective)
     #
     # We use a monotonically increasing integer 'counter' so that
     # heapq never needs to compare SearchState objects directly.
     start_state = SearchState(node=start_node, depth=0, elapsed_sec=0.0)
     start_g = 0.0
 
-    # Initial heuristic: liquidity at the start node
-    start_h = volume_heuristic_cost(
-        exchange_name=start_node[0],
-        coin=start_node[1],
-        order_notional_usd=liquid_cash_usd,
-        remaining_time_sec=max_time_sec,
-    )
+    # Initial heuristic: selected heuristic at the start node
+    if heuristic == "h2_slippage":
+        from scripts.h2_slippage import slippage_heuristic_cost
+        start_h = slippage_heuristic_cost(
+            exchange_name=start_node[0],
+            coin=start_node[1],
+            order_size_usd=liquid_cash_usd,
+            side="buy",  # Assume buying at start
+        )
+    else:  # default to h1_liquidity
+        start_h = volume_heuristic_cost(
+            exchange_name=start_node[0],
+            coin=start_node[1],
+            order_notional_usd=liquid_cash_usd,
+            remaining_time_sec=max_time_sec,
+        )
     start_f = start_g + start_h
 
     frontier: List[
@@ -171,17 +182,29 @@ def astar_best_path_with_liquidity(
                 continue
             best_g_seen[key] = new_g
 
-            # Heuristic: liquidity cost at the neighbor
+            # Heuristic: selected heuristic cost at the neighbor
             remaining_time = max_time_sec - new_elapsed
             # Current notional after taking this edge:
             new_cash = _final_cash_from_log_cost(liquid_cash_usd, new_g)
 
-            h = volume_heuristic_cost(
-                exchange_name=to_node[0],
-                coin=to_node[1],
-                order_notional_usd=new_cash,
-                remaining_time_sec=remaining_time,
-            )
+            if heuristic == "h2_slippage":
+                from scripts.h2_slippage import slippage_heuristic_cost
+                # Determine side based on edge type (trade vs transfer)
+                edge_kind = edge.get("kind", "trade")
+                side = "buy" if edge_kind == "trade" else "buy"  # Default to buy
+                h = slippage_heuristic_cost(
+                    exchange_name=to_node[0],
+                    coin=to_node[1],
+                    order_size_usd=new_cash,
+                    side=side,
+                )
+            else:  # default to h1_liquidity
+                h = volume_heuristic_cost(
+                    exchange_name=to_node[0],
+                    coin=to_node[1],
+                    order_notional_usd=new_cash,
+                    remaining_time_sec=remaining_time,
+                )
 
             f = new_g + h
 
