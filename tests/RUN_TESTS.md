@@ -3,8 +3,14 @@
 ## Quick Start
 
 ```bash
-# Run all tests
+# Run all tests (sequential)
 python3 -m unittest discover tests -v
+
+# Run all tests in parallel (recommended for faster execution)
+python3 tests/test_runner.py --parallel
+
+# Run with custom number of workers
+python3 tests/test_runner.py --parallel --workers 8
 
 # Run specific test suite
 python3 -m unittest discover tests/unit -v
@@ -21,6 +27,29 @@ python3 -m unittest tests.unit.test_models.TestExchangeNode -v
 # Run specific test method
 python3 -m unittest tests.unit.test_models.TestExchangeNode.test_node_creation -v
 ```
+
+## Parallel Test Execution
+
+The test runner supports parallel execution using threads, which can significantly speed up test runs:
+
+```bash
+# Run all tests in parallel with 4 workers (default)
+python3 tests/test_runner.py --parallel
+
+# Run with custom number of workers
+python3 tests/test_runner.py --parallel --workers 8
+
+# Show help
+python3 tests/test_runner.py --help
+```
+
+**Benefits of parallel execution:**
+- Faster test execution (especially for large test suites)
+- Better CPU utilization
+- Per-suite breakdown of results
+- Detailed timing information
+
+**Note:** Each test suite runs in a separate thread. Tests within a suite still run sequentially to avoid conflicts.
 
 ## Test Categories
 
