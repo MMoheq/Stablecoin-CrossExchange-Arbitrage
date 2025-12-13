@@ -170,8 +170,7 @@ def run_search_and_format(
     """
     Run A* from the selected start node and return a human-readable report.
 
-    Right now `heuristic_name` is just used for display; search always uses
-    the h1_liquidity heuristic implemented in astar_volat.py.
+    Uses the selected heuristic in the A* search.
     """
     try:
         ex, coin = start_wallet.split(":")
@@ -187,6 +186,7 @@ def run_search_and_format(
             max_depth=6,
             max_time_sec=1800.0,
             min_profit_usd=0.0,
+            heuristic=heuristic_name,  # Pass selected heuristic to A*
         )
     except Exception as e:
         return f"Error while running A* search: {e}"
@@ -311,11 +311,12 @@ def main():
             help="Node where your funds currently live.",
         )
 
-        # Heuristic dropdown (only one implemented for now)
+        # Heuristic dropdown
         heuristic = st.selectbox(
             "Heuristic",
             [
                 "h1_liquidity",  # volume-based heuristic
+                "h2_slippage",   # order-book slippage heuristic
             ],
             help="Select which heuristic h(n) to use in the search.",
         )
