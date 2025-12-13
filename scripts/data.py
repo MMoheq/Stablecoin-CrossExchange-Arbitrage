@@ -1,0 +1,231 @@
+import ccxt
+from math import isnan  # not strictly needed now, but harmless to keep
+
+# 1. Exchanges (added Bybit)
+EXCHANGES = {
+    "binance": ccxt.binance(),
+    "kraken": ccxt.kraken(),
+    "kucoin": ccxt.kucoin(),
+    "bybit": ccxt.bybit(),
+}
+
+# 2. Top 10 common stablecoins we’ll track
+STABLE_COINS = [
+    "USDT",
+    "USDC",
+    "DAI",
+    "TUSD",
+    "FDUSD",
+    "BUSD",
+    "PYUSD",
+    "USDP",   # Pax Dollar
+    "GUSD",   # Gemini Dollar
+    "FRAX",   # Frax
+]
+
+# 3. For each coin+exchange, specify which market symbol to use.
+#    Some markets may not exist; we’ll skip those gracefully.
+COIN_MARKETS = {
+    "USDT": {
+        "binance": "USDC/USDT",   # USDC priced in USDT (invert to get USDT in USD)
+        "kraken":  "USDT/USD",    # direct
+        "kucoin":  "USDT/USDC",   # USDT priced in USDC
+        "bybit":   "USDC/USDT",   # same trick as binance (invert)
+    },
+    "USDC": {
+        "binance": "USDC/USDT",
+        "kraken":  "USDC/USD",
+        "kucoin":  "USDC/USDT",
+        "bybit":   "USDC/USDT",
+    },
+    "DAI": {
+        "binance": "DAI/USDT",
+        "kraken":  "DAI/USD",
+        "kucoin":  "USDT/DAI",    # USDT priced in DAI -> invert to get DAI in USD
+        "bybit":   "DAI/USDT",
+    },
+    "TUSD": {
+        "binance": "TUSD/USDT",
+        "kraken":  None,             # likely not listed
+        "kucoin":  "TUSD/USDT",
+        "bybit":   "TUSD/USDT",
+    },
+    "FDUSD": {
+        "binance": "FDUSD/USDT",
+        "kraken":  None,
+        "kucoin":  None,             # if missing, we’ll just skip
+        "bybit":   "FDUSD/USDT",
+    },
+    "BUSD": {
+        "binance": "BUSD/USDT",      # legacy but still sometimes listed
+        "kraken":  "BUSD/USD",
+        "kucoin":  "BUSD/USDT",
+        "bybit":   None,             # probably not listed
+    },
+    "PYUSD": {
+        "binance": None,
+        "kraken":  "PYUSD/USD",
+        "kucoin":  None,
+        "bybit":   None,
+    },
+    "USDP": {
+        "binance": "USDP/USDT",
+        "kraken":  None,
+        "kucoin":  "USDP/USDT",
+        "bybit":   "USDP/USDT",      # may or may not exist; errors are handled
+    },
+    "GUSD": {
+        "binance": "GUSD/USDT",
+        "kraken":  "GUSD/USD",
+        "kucoin":  None,
+        "bybit":   None,
+    },
+    "FRAX": {
+        "binance": "FRAX/USDT",
+        "kraken":  "FRAX/USD",       # if not listed, we’ll see an error and skip
+        "kucoin":  "FRAX/USDT",
+        "bybit":   "FRAX/USDT",
+    },
+}
+
+
+def normalize_price_to_usd(coin: str, market: str, mid: float) -> float | None:
+    """
+    Convert a mid price for the given market into '1 COIN ≈ X USD'.
+
+    Rules:
+      - If market is COIN/USD: mid is already USD per COIN.
+      - If market is COIN/USDT or COIN/USDC/...: treat quote ≈ 1 USD.
+      - Special cases:
+          * USDC/USDT used to infer USDT price -> invert.
+          * USDT/DAI used to infer DAI price  -> invert.
+    """
+    base, quote = market.split("/")
+
+    # Direct USD quote
+    if quote == "USD" and base == coin:
+        return mid  # USD per COIN
+
+    # Coin priced in another stable (approx 1 USD)
+    if base == coin and quote in ("USDT", "USDC", "FDUSD", "BUSD", "TUSD",
+                                  "PYUSD", "USDP", "GUSD", "FRAX"):
+        return mid  # treat quote as ≈ 1 USD
+
+    # Special case: use USDC/USDT to infer USDT price
+    if coin == "USDT" and base == "USDC" and quote == "USDT":
+        return 1.0 / mid  # USDT in USD (assuming 1 USDC ≈ 1 USD)
+
+    # Special case: KuCoin's USDT/DAI but we want DAI in USD
+    # market = "USDT/DAI" => mid = DAI per 1 USDT; if 1 USDT ≈ 1 USD then 1 DAI ≈ 1/mid USD
+    if coin == "DAI" and base == "USDT" and quote == "DAI":
+        return 1.0 / mid
+
+    # Otherwise, we don't know how to normalize this pair for this coin
+    return None
+
+
+def main():
+    # prices[coin][exchange] = coin_in_usd
+    prices: dict[str, dict[str, float]] = {c: {} for c in STABLE_COINS}
+
+    # ========== FETCH & NORMALIZE PRICES ==========
+    for coin in STABLE_COINS:
+        print(f"\n=== {coin} prices across exchanges ===")
+        for ex_name, ex in EXCHANGES.items():
+            market = COIN_MARKETS.get(coin, {}).get(ex_name)
+            if not market:
+                print(f"{ex_name:8} | no market configured")
+                continue
+
+            try:
+                ticker = ex.fetch_ticker(market)
+                bid = ticker.get("bid")
+                ask = ticker.get("ask")
+                last = ticker.get("last")
+
+                # Handle missing bid/ask/last cleanly
+                if isinstance(bid, (int, float)) and isinstance(ask, (int, float)):
+                    mid = (bid + ask) / 2.0
+                elif isinstance(last, (int, float)):
+                    mid = float(last)
+                else:
+                    print(f"{ex_name:8} | {market:10} | no recent transactions")
+                    continue
+
+                coin_in_usd = normalize_price_to_usd(coin, market, mid)
+                if coin_in_usd is None:
+                    print(f"{ex_name:8} | {market:10} | cannot normalize")
+                    continue
+
+                prices[coin][ex_name] = coin_in_usd
+                print(f"{ex_name:8} | {market:10} | mid={mid:.8f} | {coin}≈{coin_in_usd:.8f} USD")
+
+            except Exception as e:
+                msg = str(e)
+                if "does not have market symbol" in msg or "symbol" in msg.lower():
+                    desc = "no market data (symbol not listed)"
+                else:
+                    desc = f"exchange error: {msg}"
+                print(f"{ex_name:8} | {market:10} | {desc}")
+
+    # ========== CROSS-EXCHANGE (SAME COIN) ==========
+    print("\n==============================")
+    print("Cross-exchange stablecoin diffs")
+    print("==============================")
+
+    for coin in STABLE_COINS:
+        ex_price = prices[coin]
+        if len(ex_price) < 2:
+            continue  # need at least two exchanges to compare
+
+        print(f"\n--- {coin} ---")
+        names = list(ex_price.keys())
+        for i in range(len(names)):
+            for j in range(i + 1, len(names)):
+                a, b = names[i], names[j]
+                pa, pb = ex_price[a], ex_price[b]
+                diff_percent = (pb - pa) / pa * 100.0
+                print(f"{a:8} -> {b:8} | {pa:.8f} -> {pb:.8f} | diff={diff_percent:+.4f}%")
+
+    # ========== INTRA-EXCHANGE (DIFFERENT COINS) ==========
+    print("\n==============================")
+    print("Intra-exchange stablecoin conversions")
+    print("==============================")
+
+    # For each exchange, compare all pairs of coins that have a price there.
+    for ex_name in EXCHANGES.keys():
+        # Collect all coins that have a price for this exchange
+        coin_prices_here = {
+            coin: prices[coin][ex_name]
+            for coin in STABLE_COINS
+            if ex_name in prices[coin]
+        }
+
+        if len(coin_prices_here) < 2:
+            continue  # need at least two coins to compare
+
+        print(f"\n--- {ex_name} ---")
+        coins_here = list(coin_prices_here.keys())
+
+        for i in range(len(coins_here)):
+            for j in range(len(coins_here)):
+                if i == j:
+                    continue
+                c_from = coins_here[i]
+                c_to = coins_here[j]
+                p_from = coin_prices_here[c_from]  # USD per 1 c_from
+                p_to = coin_prices_here[c_to]      # USD per 1 c_to
+
+                # How many units of c_to do you get for 1 unit of c_from?
+                # Intuition: value in USD stays ~1, so rate ≈ p_from / p_to
+                rate = p_from / p_to
+                diff_percent = (rate - 1.0) * 100.0
+
+                print(
+                    f"1 {c_from} -> {rate:.6f} {c_to} | "
+                    f"spread_vs_1: {diff_percent:+.4f}%"
+                )
+
+
+if __name__ == "__main__":
+    main()
