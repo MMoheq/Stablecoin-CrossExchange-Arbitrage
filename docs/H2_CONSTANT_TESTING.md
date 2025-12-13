@@ -4,6 +4,8 @@
 
 This document describes the test suite for evaluating different constant values in the `h2_slippage` heuristic. The tests systematically vary three key constants to understand their impact on arbitrage path discovery and profitability.
 
+**For detailed test results and analysis, see**: [H2_CONSTANT_TEST_RESULTS.md](./H2_CONSTANT_TEST_RESULTS.md)
+
 ## Test Data and Parameters
 
 ### Default Test Configuration
