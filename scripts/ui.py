@@ -7,6 +7,7 @@ from __future__ import annotations
 import sys
 import logging
 import io
+import threading
 from pathlib import Path
 
 # Add project root to path
@@ -215,10 +216,14 @@ def run_search_and_format(
     formatter = logging.Formatter('%(message)s')  # Simplified format
     handler.setFormatter(formatter)
     
-    # Get the logger for astar_vol module
+    # Get loggers for both astar_vol and h3_parallel modules
     astar_logger = logging.getLogger('scripts.astar_vol')
     astar_logger.addHandler(handler)
     astar_logger.setLevel(logging.INFO)
+    
+    h3_parallel_logger = logging.getLogger('scripts.h3_parallel')
+    h3_parallel_logger.addHandler(handler)
+    h3_parallel_logger.setLevel(logging.INFO)
     
     # Add Streamlit handler if container provided
     streamlit_handler = None
@@ -226,48 +231,87 @@ def run_search_and_format(
         streamlit_handler = StreamlitLogHandler(status_container)
         streamlit_handler.setLevel(logging.INFO)
         streamlit_handler.setFormatter(logging.Formatter('%(message)s'))
+        # Add to both loggers so parallel search logs are captured
         astar_logger.addHandler(streamlit_handler)
+        h3_parallel_logger.addHandler(streamlit_handler)
     
     try:
         # Verify heuristic parameter is being passed correctly
-        if heuristic_name not in ["h1_liquidity", "h2_slippage"]:
+        if heuristic_name not in ["h1_liquidity", "h2_slippage", "h3_parallel"]:
             if streamlit_handler:
                 astar_logger.removeHandler(streamlit_handler)
+                h3_parallel_logger.removeHandler(streamlit_handler)
             astar_logger.removeHandler(handler)
-            return f"Invalid heuristic: {heuristic_name}. Must be 'h1_liquidity' or 'h2_slippage'."
+            h3_parallel_logger.removeHandler(handler)
+            return f"Invalid heuristic: {heuristic_name}. Must be 'h1_liquidity', 'h2_slippage', or 'h3_parallel'."
         
-        result: Optional[PlanResult] = astar_best_path_with_liquidity(
-            start_node=start_node,
-            liquid_cash_usd=liquid_cash,
-            max_depth=6,
-            max_time_sec=1800.0,
-            min_profit_usd=0.0,
-            heuristic=heuristic_name,  # Pass selected heuristic to A*
-        )
+        # Handle parallel search heuristic
+        if heuristic_name == "h3_parallel":
+            from scripts.h3_parallel import parallel_search_from_random_starts
+            
+            if streamlit_handler:
+                streamlit_handler.container.text("Running parallel search from 3 random starting points...")
+            
+            # For parallel search, we need to choose a base heuristic
+            # Default to h1_liquidity, but could be made configurable
+            base_heuristic = "h1_liquidity"
+            
+            result: Optional[PlanResult] = parallel_search_from_random_starts(
+                liquid_cash_usd=liquid_cash,
+                max_depth=6,
+                max_time_sec=1800.0,
+                min_profit_usd=0.0,
+                heuristic=base_heuristic,  # Base heuristic for each parallel search
+                num_starts=3,
+            )
+        else:
+            # Standard single-start search
+            result = astar_best_path_with_liquidity(
+                start_node=start_node,
+                liquid_cash_usd=liquid_cash,
+                max_depth=6,
+                max_time_sec=1800.0,
+                min_profit_usd=0.0,
+                heuristic=heuristic_name,  # Pass selected heuristic to A*
+            )
         
         # Clean up handlers
         if streamlit_handler:
             astar_logger.removeHandler(streamlit_handler)
+            h3_parallel_logger.removeHandler(streamlit_handler)
         astar_logger.removeHandler(handler)
+        h3_parallel_logger.removeHandler(handler)
         
     except Exception as e:
         if streamlit_handler:
             astar_logger.removeHandler(streamlit_handler)
+            h3_parallel_logger.removeHandler(streamlit_handler)
         astar_logger.removeHandler(handler)
+        h3_parallel_logger.removeHandler(handler)
         return f"Error while running A* search: {e}"
 
     if result is None:
-        return (
-            f"No profitable path found from {start_wallet} with "
-            f"{liquid_cash:.2f} USD using heuristic {heuristic_name}."
-        )
+        if heuristic_name == "h3_parallel":
+            return (
+                f"No profitable path found from any of the 3 random starting points "
+                f"with {liquid_cash:.2f} USD using parallel search."
+            )
+        else:
+            return (
+                f"No profitable path found from {start_wallet} with "
+                f"{liquid_cash:.2f} USD using heuristic {heuristic_name}."
+            )
 
     profit_pct = (result.profit_usd / liquid_cash) * 100.0 if liquid_cash > 0 else 0.0
     route_str = " -> ".join(f"{ex}:{c}" for (ex, c) in result.path)
 
     lines: list[str] = []
-    lines.append(f"Max profitable current trade (A* with {heuristic_name}):")
-    lines.append(f"Start node: {start_wallet}")
+    if heuristic_name == "h3_parallel":
+        lines.append(f"Max profitable current trade (Parallel search from 3 random starts):")
+        lines.append(f"Note: Searched from 3 random starting points in parallel")
+    else:
+        lines.append(f"Max profitable current trade (A* with {heuristic_name}):")
+        lines.append(f"Start node: {start_wallet}")
     lines.append(f"Start cash: {liquid_cash:.2f} USD")
     lines.append(f"Final cash: {result.final_cash_usd:.2f} USD")
     lines.append(f"Profit: {result.profit_usd:.2f} USD ({profit_pct:.4f}%)")
@@ -414,25 +458,31 @@ def main():
             help="Total capital available to allocate to a trade.",
         )
 
-        # Start wallet selection
-        start_wallet = st.selectbox(
-            "Starting wallet (exchange:coin)",
-            options=start_wallet_options,
-            index=start_wallet_options.index(default_start)
-            if default_start in start_wallet_options
-            else 0,
-            help="Node where your funds currently live.",
-        )
-
         # Heuristic dropdown
         heuristic = st.selectbox(
             "Heuristic",
             [
                 "h1_liquidity",  # volume-based heuristic
                 "h2_slippage",   # order-book slippage heuristic
+                "h3_parallel",   # parallel search from random starts
             ],
             help="Select which heuristic h(n) to use in the search.",
         )
+
+        # Start wallet selection (only shown if not using parallel search)
+        if heuristic != "h3_parallel":
+            start_wallet = st.selectbox(
+                "Starting wallet (exchange:coin)",
+                options=start_wallet_options,
+                index=start_wallet_options.index(default_start)
+                if default_start in start_wallet_options
+                else 0,
+                help="Node where your funds currently live.",
+            )
+        else:
+            # For parallel search, we don't need a starting wallet
+            start_wallet = start_wallet_options[0] if start_wallet_options else "binance:USDT"
+            st.info("ℹ️ Parallel search will use 3 random starting points")
 
         st.markdown("---")
         st.subheader("Max profitable current trade")
