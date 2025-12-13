@@ -5,13 +5,17 @@
 from __future__ import annotations # lets the file use flexible type hints without worrying about import order.
 
 import heapq
+import logging
 from dataclasses import dataclass #used so we dont use _init_ and _repr_
 from math import exp
 from typing import Any, Dict, List, Optional, Tuple
 
 from scripts.graph import build_graph            
 from scripts.h1_vol import volume_heuristic_cost
-# h2_slippage imported conditionally when needed 
+# h2_slippage imported conditionally when needed
+
+# Set up logging
+logger = logging.getLogger(__name__) 
 
 
 # Node is ("binance", "USDT")
@@ -103,6 +107,9 @@ def astar_best_path_with_liquidity(
     start_g = 0.0
 
     # Initial heuristic: selected heuristic at the start node
+    logger.info(f"A* search starting with heuristic: {heuristic}")
+    logger.info(f"Start node: {start_node}, liquid_cash: ${liquid_cash_usd:.2f}")
+    
     if heuristic == "h2_slippage":
         from scripts.h2_slippage import slippage_heuristic_cost
         start_h = slippage_heuristic_cost(
@@ -111,14 +118,19 @@ def astar_best_path_with_liquidity(
             order_size_usd=liquid_cash_usd,
             side="buy",  # Assume buying at start
         )
-    else:  # default to h1_liquidity
+        logger.info(f"Start node h2_slippage heuristic: {start_h:.6f}")
+    elif heuristic == "h1_liquidity":
         start_h = volume_heuristic_cost(
             exchange_name=start_node[0],
             coin=start_node[1],
             order_notional_usd=liquid_cash_usd,
             remaining_time_sec=max_time_sec,
         )
+        logger.info(f"Start node h1_liquidity heuristic: {start_h:.6f}")
+    else:
+        raise ValueError(f"Unknown heuristic: {heuristic}. Must be 'h1_liquidity' or 'h2_slippage'")
     start_f = start_g + start_h
+    logger.info(f"Start f_score: {start_f:.6f} (g={start_g:.6f} + h={start_h:.6f})")
 
     frontier: List[
         Tuple[float, float, int, SearchState, List[NodeId], List[Dict[str, Any]]]
@@ -152,6 +164,11 @@ def astar_best_path_with_liquidity(
                         edges=path_edges.copy(),
                         final_cash_usd=final_cash,
                         profit_usd=profit,
+                    )
+                    logger.info(
+                        f"New best path found (heuristic={heuristic}): "
+                        f"profit=${profit:.2f}, path_length={len(path_nodes)}, "
+                        f"path={' -> '.join(f'{ex}:{c}' for (ex, c) in path_nodes)}"
                     )
 
         # Stop expanding if depth/time limits reached
@@ -198,13 +215,23 @@ def astar_best_path_with_liquidity(
                     order_size_usd=new_cash,
                     side=side,
                 )
-            else:  # default to h1_liquidity
+                logger.debug(
+                    f"  h2_slippage at {to_node[0]}:{to_node[1]}: h={h:.6f} "
+                    f"(order_size=${new_cash:.2f})"
+                )
+            elif heuristic == "h1_liquidity":
                 h = volume_heuristic_cost(
                     exchange_name=to_node[0],
                     coin=to_node[1],
                     order_notional_usd=new_cash,
                     remaining_time_sec=remaining_time,
                 )
+                logger.debug(
+                    f"  h1_liquidity at {to_node[0]}:{to_node[1]}: h={h:.6f} "
+                    f"(order_size=${new_cash:.2f}, remaining_time={remaining_time:.1f}s)"
+                )
+            else:
+                raise ValueError(f"Unknown heuristic: {heuristic}. Must be 'h1_liquidity' or 'h2_slippage'")
 
             f = new_g + h
 
@@ -219,4 +246,14 @@ def astar_best_path_with_liquidity(
             )
             counter += 1
 
+    if best_result is None:
+        logger.info(f"A* search completed (heuristic={heuristic}): No profitable path found")
+        return None
+
+    logger.info(
+        f"A* search completed (heuristic={heuristic}): "
+        f"Final profit=${best_result.profit_usd:.2f}, "
+        f"path_length={len(best_result.path)}, "
+        f"path={' -> '.join(f'{ex}:{c}' for (ex, c) in best_result.path)}"
+    )
     return best_result
