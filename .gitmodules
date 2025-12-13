@@ -1,0 +1,3 @@
+[submodule "external/StableCoin_ArbitrageV2"]
+	path = external/StableCoin_ArbitrageV2
+	url = https://github.com/ARIOCHEWY/StableCoin_ArbitrageV2.git
