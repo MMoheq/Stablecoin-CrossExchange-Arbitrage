@@ -1,0 +1,156 @@
+=== Building graph ===
+Graph has 19 nodes
+
+Using start nodes:
+  - binance:BUSD
+  - binance:USDT
+  - kraken:USDT
+  - kucoin:USDT
+  - kucoin:DAI
+
+============================
+Order size: $1,000.00
+============================
+
+Running h1_liquidity from binance:BUSD ...
+  SUCCESS: final=$1003.29 (profit=$3.29), path_len=4, time=69.444s
+
+Running h2_slippage from binance:BUSD ...
+  SUCCESS: final=$1003.29 (profit=$3.29), path_len=4, time=81.015s
+
+Running h1_liquidity from binance:USDT ...
+  SUCCESS: final=$1004.25 (profit=$4.25), path_len=3, time=73.022s
+
+Running h2_slippage from binance:USDT ...
+  SUCCESS: final=$1004.25 (profit=$4.25), path_len=3, time=89.171s
+
+Running h1_liquidity from kraken:USDT ...
+  SUCCESS: final=$1004.24 (profit=$4.24), path_len=3, time=69.233s
+
+Running h2_slippage from kraken:USDT ...
+  SUCCESS: final=$1004.24 (profit=$4.24), path_len=3, time=83.934s
+
+Running h1_liquidity from kucoin:USDT ...
+  SUCCESS: final=$1004.27 (profit=$4.27), path_len=2, time=68.583s
+
+Running h2_slippage from kucoin:USDT ...
+  SUCCESS: final=$1004.27 (profit=$4.27), path_len=2, time=78.028s
+
+Running h1_liquidity from kucoin:DAI ...
+  SUCCESS: final=$1003.12 (profit=$3.12), path_len=2, time=63.306s
+
+Running h2_slippage from kucoin:DAI ...
+  SUCCESS: final=$1003.12 (profit=$3.12), path_len=2, time=75.876s
+
+Running h3_parallel (random starts) ...
+  h3_parallel SUCCESS: final=$1004.25 (profit=$4.25), path_len=3, time=202.617s
+
+============================
+Order size: $10,000.00
+============================
+
+Running h1_liquidity from binance:BUSD ...
+  SUCCESS: final=$10032.92 (profit=$32.92), path_len=4, time=78.394s
+
+Running h2_slippage from binance:BUSD ...
+  SUCCESS: final=$10032.92 (profit=$32.92), path_len=4, time=74.916s
+
+Running h1_liquidity from binance:USDT ...
+  SUCCESS: final=$10042.46 (profit=$42.46), path_len=3, time=116.745s
+
+Running h2_slippage from binance:USDT ...
+  SUCCESS: final=$10042.46 (profit=$42.46), path_len=3, time=81.993s
+
+Running h1_liquidity from kraken:USDT ...
+  SUCCESS: final=$10042.41 (profit=$42.41), path_len=3, time=122.918s
+
+Running h2_slippage from kraken:USDT ...
+  SUCCESS: final=$10042.41 (profit=$42.41), path_len=3, time=80.086s
+
+Running h1_liquidity from kucoin:USDT ...
+  SUCCESS: final=$10042.71 (profit=$42.71), path_len=2, time=94.832s
+
+Running h2_slippage from kucoin:USDT ...
+  SUCCESS: final=$10042.71 (profit=$42.71), path_len=2, time=76.917s
+
+Running h1_liquidity from kucoin:DAI ...
+  SUCCESS: final=$10032.18 (profit=$32.18), path_len=2, time=84.830s
+
+Running h2_slippage from kucoin:DAI ...
+  SUCCESS: final=$10031.17 (profit=$31.17), path_len=2, time=68.579s
+
+Running h3_parallel (random starts) ...
+  h3_parallel SUCCESS: final=$10042.46 (profit=$42.46), path_len=3, time=243.950s
+
+============================
+Order size: $100,000.00
+============================
+
+Running h1_liquidity from binance:BUSD ...
+  SUCCESS: final=$100329.18 (profit=$329.18), path_len=4, time=158.129s
+
+Running h2_slippage from binance:BUSD ...
+  SUCCESS: final=$100329.18 (profit=$329.18), path_len=4, time=81.045s
+
+Running h1_liquidity from binance:USDT ...
+  SUCCESS: final=$100424.60 (profit=$424.60), path_len=3, time=231.358s
+
+Running h2_slippage from binance:USDT ...
+  SUCCESS: final=$100424.60 (profit=$424.60), path_len=3, time=93.176s
+
+Running h1_liquidity from kraken:USDT ...
+  SUCCESS: final=$100424.10 (profit=$424.10), path_len=3, time=259.136s
+
+Running h2_slippage from kraken:USDT ...
+  SUCCESS: final=$100424.10 (profit=$424.10), path_len=3, time=84.337s
+
+Running h1_liquidity from kucoin:USDT ...
+  SUCCESS: final=$100427.11 (profit=$427.11), path_len=2, time=234.771s
+
+Running h2_slippage from kucoin:USDT ...
+  SUCCESS: final=$100427.11 (profit=$427.11), path_len=2, time=80.525s
+
+Running h1_liquidity from kucoin:DAI ...
+  SUCCESS: final=$100316.74 (profit=$316.74), path_len=2, time=147.309s
+
+Running h2_slippage from kucoin:DAI ...
+  SUCCESS: final=$100301.71 (profit=$301.71), path_len=2, time=80.850s
+
+Running h3_parallel (random starts) ...
+  h3_parallel SUCCESS: final=$100424.60 (profit=$424.60), path_len=3, time=349.680s
+
+
+================ SUMMARY ================
+[OK] h=h1_liquidity start=binance:BUSD       cash=$ 1,000.00 final=$1003.29   profit=$3.29      len=  4 time=69.444s
+[OK] h=h2_slippage  start=binance:BUSD       cash=$ 1,000.00 final=$1003.29   profit=$3.29      len=  4 time=81.015s
+[OK] h=h1_liquidity start=binance:USDT       cash=$ 1,000.00 final=$1004.25   profit=$4.25      len=  3 time=73.022s
+[OK] h=h2_slippage  start=binance:USDT       cash=$ 1,000.00 final=$1004.25   profit=$4.25      len=  3 time=89.171s
+[OK] h=h1_liquidity start=kraken:USDT        cash=$ 1,000.00 final=$1004.24   profit=$4.24      len=  3 time=69.233s
+[OK] h=h2_slippage  start=kraken:USDT        cash=$ 1,000.00 final=$1004.24   profit=$4.24      len=  3 time=83.934s
+[OK] h=h1_liquidity start=kucoin:USDT        cash=$ 1,000.00 final=$1004.27   profit=$4.27      len=  2 time=68.583s
+[OK] h=h2_slippage  start=kucoin:USDT        cash=$ 1,000.00 final=$1004.27   profit=$4.27      len=  2 time=78.028s
+[OK] h=h1_liquidity start=kucoin:DAI         cash=$ 1,000.00 final=$1003.12   profit=$3.12      len=  2 time=63.306s
+[OK] h=h2_slippage  start=kucoin:DAI         cash=$ 1,000.00 final=$1003.12   profit=$3.12      len=  2 time=75.876s
+[OK] h=h3_parallel  start=random_parallel    cash=$ 1,000.00 final=$1004.25   profit=$4.25      len=  3 time=202.617s
+[OK] h=h1_liquidity start=binance:BUSD       cash=$10,000.00 final=$10032.92  profit=$32.92     len=  4 time=78.394s
+[OK] h=h2_slippage  start=binance:BUSD       cash=$10,000.00 final=$10032.92  profit=$32.92     len=  4 time=74.916s
+[OK] h=h1_liquidity start=binance:USDT       cash=$10,000.00 final=$10042.46  profit=$42.46     len=  3 time=116.745s
+[OK] h=h2_slippage  start=binance:USDT       cash=$10,000.00 final=$10042.46  profit=$42.46     len=  3 time=81.993s
+[OK] h=h1_liquidity start=kraken:USDT        cash=$10,000.00 final=$10042.41  profit=$42.41     len=  3 time=122.918s
+[OK] h=h2_slippage  start=kraken:USDT        cash=$10,000.00 final=$10042.41  profit=$42.41     len=  3 time=80.086s
+[OK] h=h1_liquidity start=kucoin:USDT        cash=$10,000.00 final=$10042.71  profit=$42.71     len=  2 time=94.832s
+[OK] h=h2_slippage  start=kucoin:USDT        cash=$10,000.00 final=$10042.71  profit=$42.71     len=  2 time=76.917s
+[OK] h=h1_liquidity start=kucoin:DAI         cash=$10,000.00 final=$10032.18  profit=$32.18     len=  2 time=84.830s
+[OK] h=h2_slippage  start=kucoin:DAI         cash=$10,000.00 final=$10031.17  profit=$31.17     len=  2 time=68.579s
+[OK] h=h3_parallel  start=random_parallel    cash=$10,000.00 final=$10042.46  profit=$42.46     len=  3 time=243.950s
+[OK] h=h1_liquidity start=binance:BUSD       cash=$100,000.00 final=$100329.18 profit=$329.18    len=  4 time=158.129s
+[OK] h=h2_slippage  start=binance:BUSD       cash=$100,000.00 final=$100329.18 profit=$329.18    len=  4 time=81.045s
+[OK] h=h1_liquidity start=binance:USDT       cash=$100,000.00 final=$100424.60 profit=$424.60    len=  3 time=231.358s
+[OK] h=h2_slippage  start=binance:USDT       cash=$100,000.00 final=$100424.60 profit=$424.60    len=  3 time=93.176s
+[OK] h=h1_liquidity start=kraken:USDT        cash=$100,000.00 final=$100424.10 profit=$424.10    len=  3 time=259.136s
+[OK] h=h2_slippage  start=kraken:USDT        cash=$100,000.00 final=$100424.10 profit=$424.10    len=  3 time=84.337s
+[OK] h=h1_liquidity start=kucoin:USDT        cash=$100,000.00 final=$100427.11 profit=$427.11    len=  2 time=234.771s
+[OK] h=h2_slippage  start=kucoin:USDT        cash=$100,000.00 final=$100427.11 profit=$427.11    len=  2 time=80.525s
+[OK] h=h1_liquidity start=kucoin:DAI         cash=$100,000.00 final=$100316.74 profit=$316.74    len=  2 time=147.309s
+[OK] h=h2_slippage  start=kucoin:DAI         cash=$100,000.00 final=$100301.71 profit=$301.71    len=  2 time=80.850s
+[OK] h=h3_parallel  start=random_parallel    cash=$100,000.00 final=$100424.60 profit=$424.60    len=  3 time=349.680s

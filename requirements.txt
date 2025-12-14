@@ -2,3 +2,4 @@ ccxt
 networkx
 matplotlib
 streamlit
+pytest
