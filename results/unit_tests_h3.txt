@@ -1,0 +1,24 @@
+Run at 2025-12-14T12:59:40.498941+00:00
+
+============================================================================================== test session starts ==============================================================================================
+platform win32 -- Python 3.13.3, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\ariok\AppData\Local\Programs\Python\Python313\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\ariok\source\repos\cmpt417\Stable\Stablecoin-CrossExchange-Arbitrage\experiments
+plugins: anyio-4.9.0
+collecting ... collected 3 items
+
+run_h3_unit_tests.py::test_parallel_search_empty_graph PASSED                                                                                                                                              [ 33%]
+run_h3_unit_tests.py::test_parallel_search_picks_best_result PASSED                                                                                                                                        [ 66%]
+run_h3_unit_tests.py::test_parallel_search_respects_num_starts PASSED                                                                                                                                      [100%]
+
+=============================================================================================== slowest durations ===============================================================================================
+0.00s call     run_h3_unit_tests.py::test_parallel_search_picks_best_result
+0.00s call     run_h3_unit_tests.py::test_parallel_search_respects_num_starts
+0.00s setup    run_h3_unit_tests.py::test_parallel_search_empty_graph
+0.00s setup    run_h3_unit_tests.py::test_parallel_search_respects_num_starts
+0.00s teardown run_h3_unit_tests.py::test_parallel_search_empty_graph
+0.00s teardown run_h3_unit_tests.py::test_parallel_search_picks_best_result
+0.00s setup    run_h3_unit_tests.py::test_parallel_search_picks_best_result
+0.00s call     run_h3_unit_tests.py::test_parallel_search_empty_graph
+0.00s teardown run_h3_unit_tests.py::test_parallel_search_respects_num_starts
+=============================================================================================== 3 passed in 0.02s ===============================================================================================

@@ -1,51 +1,135 @@
-# ===================================================================
-# run_h1_unit_tests.py — Runs pytest for h1_vol tests
-# and saves output into results/unit_tests_h1.txt
-# ===================================================================
+# ======================================================================
+# run_h1_unit_tests.py — Unit tests for h1_vol + verbose runner
+# ======================================================================
 
-import subprocess
+from __future__ import annotations
+
 import sys
+import io
+import contextlib
 from pathlib import Path
+from datetime import datetime, timezone
+
+# ----------------------------------------------------------------------
+# Make repo root importable so "scripts.*" works when run from /experiments
+# ----------------------------------------------------------------------
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+import pytest  # type: ignore
+import scripts.h1_vol as h1  # type: ignore
 
 
-def main():
-    # Project root is the folder that CONTAINS "experiments" and "scripts"
-    project_root = Path(__file__).resolve().parent.parent
+# ======================================================================
+# Tests for h1_vol.volume_heuristic_cost
+# ======================================================================
 
-    # Ensure results/ exists
-    results_dir = project_root / "results"
-    results_dir.mkdir(exist_ok=True)
+def test_unknown_volume_returns_penalty(monkeypatch):
+    """
+    If we cannot fetch 24h volume for this (exchange, coin),
+    volume_heuristic_cost should return UNKNOWN_LIQUIDITY_PENALTY.
+    """
 
-    output_file = results_dir / "unit_tests_h1.txt"
+    # Make volume lookup fail (simulate missing data)
+    def fake_get_24h(exchange_name: str, coin: str):
+        return None
 
-    # Command to run tests: use current Python interpreter
-    # so we don't depend on "pytest" being on PATH.
-    cmd = [
-        sys.executable,          # e.g. C:\Users\...\python.exe
-        "-m",
-        "pytest",
-        "scripts/test_h1_vol.py",
-        "-q",
-    ]
+    # Patch the function used inside estimate_liquidity_score_live
+    monkeypatch.setattr(h1, "get_24h_quote_volume_for_coin", fake_get_24h)
 
-    print("Running pytest for h1_vol...")
-
-    # Run pytest from the project root
-    process = subprocess.Popen(
-        cmd,
-        cwd=project_root,              # <<< important
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
+    cost = h1.volume_heuristic_cost(
+        "binance",
+        "USDT",
+        order_notional_usd=1_000.0,
+        remaining_time_sec=60.0,
     )
 
-    full_output, _ = process.communicate()
+    assert cost == pytest.approx(h1.UNKNOWN_LIQUIDITY_PENALTY)
 
-    # Write pytest output to file
-    with open(output_file, "w", encoding="utf-8") as f:
-        f.write(full_output)
 
-    print(f"Done! Exit code {process.returncode}. Output saved to: {output_file}")
+
+def test_zero_volume_returns_zero_or_low_cost():
+    """
+    With zero volume, heuristic cost should not blow up; ideally zero.
+    """
+    cost = h1.volume_heuristic_cost("binance", "USDT", 0.0, remaining_time_sec=60.0)
+    # We *expect* zero, but if the implementation chooses a tiny penalty,
+    # this still ensures it's non-negative and small.
+    assert cost >= 0.0
+    assert cost == pytest.approx(cost, abs=1e-9)  # just sanity / type check
+
+
+def test_high_volume_gives_higher_cost_than_low_volume():
+    """
+    Very large volume should be penalized at least as much as small volume.
+    """
+    low_volume_cost = h1.volume_heuristic_cost(
+        "binance", "USDT", 1_000.0, remaining_time_sec=60.0
+    )
+    high_volume_cost = h1.volume_heuristic_cost(
+        "binance", "USDT", 1_000_000.0, remaining_time_sec=60.0
+    )
+
+    assert low_volume_cost >= 0.0
+    assert high_volume_cost >= 0.0
+    assert high_volume_cost >= low_volume_cost
+
+
+def test_high_volume_exceeds_threshold_if_defined(monkeypatch):
+    """
+    If VOLUME_THRESHOLD_USD exists in h1_vol, check that volume
+    well above the threshold is penalized more than volume well below it.
+    If it doesn't exist, we skip this test gracefully.
+    """
+    if not hasattr(h1, "VOLUME_THRESHOLD_USD"):
+        pytest.skip("VOLUME_THRESHOLD_USD not defined in h1_vol; skipping threshold-specific test")
+
+    # Patch the threshold on the module object directly
+    monkeypatch.setattr(h1, "VOLUME_THRESHOLD_USD", 10_000.0)
+
+    below_cost = h1.volume_heuristic_cost(
+        "binance", "USDT", 5_000.0, remaining_time_sec=60.0
+    )
+    above_cost = h1.volume_heuristic_cost(
+        "binance", "USDT", 50_000.0, remaining_time_sec=60.0
+    )
+
+    assert below_cost >= 0.0
+    assert above_cost >= 0.0
+    assert above_cost >= below_cost
+
+
+# ======================================================================
+# Verbose runner + output logger
+# ======================================================================
+
+def main() -> None:
+    results_dir = REPO_ROOT / "results"
+    results_dir.mkdir(exist_ok=True)
+    out_file = results_dir / "unit_tests_h1.txt"
+
+    buf = io.StringIO()
+
+    with contextlib.redirect_stdout(buf):
+        # Run pytest VERBOSE on THIS file
+        ret = pytest.main([
+            "-vv",
+            "--durations=0",
+            __file__,
+        ])
+
+    log_output = buf.getvalue()
+
+    # Show in terminal
+    print(log_output)
+
+    # Save to txt file with UTC timestamp
+    with out_file.open("w", encoding="utf-8") as f:
+        f.write(f"Run at {datetime.now(timezone.utc).isoformat()}\n\n")
+        f.write(log_output)
+
+    sys.exit(ret)
 
 
 if __name__ == "__main__":

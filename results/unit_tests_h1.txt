@@ -1,4 +1,28 @@
-ERROR: file or directory not found: scripts/test_h1_vol.py
+Run at 2025-12-14T13:10:21.213888+00:00
 
+============================================================================================== test session starts ==============================================================================================
+platform win32 -- Python 3.13.3, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\ariok\AppData\Local\Programs\Python\Python313\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\ariok\source\repos\cmpt417\Stable\Stablecoin-CrossExchange-Arbitrage\experiments
+plugins: anyio-4.9.0
+collecting ... collected 4 items
 
-no tests ran in 0.00s
+run_h1_unit_tests.py::test_unknown_volume_returns_penalty PASSED                                                                                                                                           [ 25%]
+run_h1_unit_tests.py::test_zero_volume_returns_zero_or_low_cost PASSED                                                                                                                                     [ 50%]
+run_h1_unit_tests.py::test_high_volume_gives_higher_cost_than_low_volume PASSED                                                                                                                            [ 75%]
+run_h1_unit_tests.py::test_high_volume_exceeds_threshold_if_defined SKIPPED (VOLUME_THRESHOLD_USD not defined in h1_vol; skipping threshold-specific test)                                                 [100%]
+
+=============================================================================================== slowest durations ===============================================================================================
+1.38s call     run_h1_unit_tests.py::test_zero_volume_returns_zero_or_low_cost
+0.19s call     run_h1_unit_tests.py::test_high_volume_gives_higher_cost_than_low_volume
+0.00s teardown run_h1_unit_tests.py::test_zero_volume_returns_zero_or_low_cost
+0.00s setup    run_h1_unit_tests.py::test_high_volume_gives_higher_cost_than_low_volume
+0.00s setup    run_h1_unit_tests.py::test_unknown_volume_returns_penalty
+0.00s call     run_h1_unit_tests.py::test_unknown_volume_returns_penalty
+0.00s setup    run_h1_unit_tests.py::test_high_volume_exceeds_threshold_if_defined
+0.00s teardown run_h1_unit_tests.py::test_high_volume_gives_higher_cost_than_low_volume
+0.00s teardown run_h1_unit_tests.py::test_unknown_volume_returns_penalty
+0.00s teardown run_h1_unit_tests.py::test_high_volume_exceeds_threshold_if_defined
+0.00s call     run_h1_unit_tests.py::test_high_volume_exceeds_threshold_if_defined
+0.00s setup    run_h1_unit_tests.py::test_zero_volume_returns_zero_or_low_cost
+========================================================================================= 3 passed, 1 skipped in 1.59s ==========================================================================================

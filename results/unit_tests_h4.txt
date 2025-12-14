@@ -1,0 +1,64 @@
+Run at 2025-12-14T12:55:35.352044+00:00
+
+============================================================================================== test session starts ==============================================================================================
+platform win32 -- Python 3.13.3, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\ariok\AppData\Local\Programs\Python\Python313\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\ariok\source\repos\cmpt417\Stable\Stablecoin-CrossExchange-Arbitrage\experiments
+plugins: anyio-4.9.0
+collecting ... collected 13 items
+
+run_h4_unit_tests.py::test_kickback_risk_zero_when_no_remaining_time PASSED                                                                                                                                [  7%]
+run_h4_unit_tests.py::test_kickback_risk_zero_when_fastest_hop_slower_than_window PASSED                                                                                                                   [ 15%]
+run_h4_unit_tests.py::test_kickback_risk_between_zero_and_one PASSED                                                                                                                                       [ 23%]
+run_h4_unit_tests.py::test_kickback_risk_clamped_to_one PASSED                                                                                                                                             [ 30%]
+run_h4_unit_tests.py::test_kickback_risk_zero_when_no_transfer_info PASSED                                                                                                                                 [ 38%]
+run_h4_unit_tests.py::test_chain_congestion_heuristic_uses_weight PASSED                                                                                                                                   [ 46%]
+run_h4_unit_tests.py::test_chain_congestion_heuristic_non_negative PASSED                                                                                                                                  [ 53%]
+run_h4_unit_tests.py::test_estimate_exchange_reliability_score_known_exchange PASSED                                                                                                                       [ 61%]
+run_h4_unit_tests.py::test_estimate_exchange_reliability_score_unknown_exchange PASSED                                                                                                                     [ 69%]
+run_h4_unit_tests.py::test_exchange_risk_heuristic_cost_known_exchange PASSED                                                                                                                              [ 76%]
+run_h4_unit_tests.py::test_exchange_risk_heuristic_cost_unknown_exchange_uses_fallback PASSED                                                                                                              [ 84%]
+run_h4_unit_tests.py::test_exchange_risk_respects_weight PASSED                                                                                                                                            [ 92%]
+run_h4_unit_tests.py::test_chain_exchange_risk_heuristic_is_sum_of_parts PASSED                                                                                                                            [100%]
+
+=============================================================================================== slowest durations ===============================================================================================
+0.00s setup    run_h4_unit_tests.py::test_kickback_risk_zero_when_no_remaining_time
+0.00s call     run_h4_unit_tests.py::test_kickback_risk_between_zero_and_one
+0.00s setup    run_h4_unit_tests.py::test_kickback_risk_zero_when_fastest_hop_slower_than_window
+0.00s setup    run_h4_unit_tests.py::test_chain_congestion_heuristic_non_negative
+0.00s teardown run_h4_unit_tests.py::test_kickback_risk_zero_when_no_remaining_time
+0.00s setup    run_h4_unit_tests.py::test_kickback_risk_zero_when_no_transfer_info
+0.00s setup    run_h4_unit_tests.py::test_kickback_risk_between_zero_and_one
+0.00s teardown run_h4_unit_tests.py::test_kickback_risk_zero_when_fastest_hop_slower_than_window
+0.00s teardown run_h4_unit_tests.py::test_chain_congestion_heuristic_uses_weight
+0.00s setup    run_h4_unit_tests.py::test_kickback_risk_clamped_to_one
+0.00s call     run_h4_unit_tests.py::test_kickback_risk_zero_when_no_remaining_time
+0.00s setup    run_h4_unit_tests.py::test_chain_congestion_heuristic_uses_weight
+0.00s call     run_h4_unit_tests.py::test_chain_congestion_heuristic_uses_weight
+0.00s setup    run_h4_unit_tests.py::test_chain_exchange_risk_heuristic_is_sum_of_parts
+0.00s teardown run_h4_unit_tests.py::test_kickback_risk_between_zero_and_one
+0.00s teardown run_h4_unit_tests.py::test_kickback_risk_zero_when_no_transfer_info
+0.00s teardown run_h4_unit_tests.py::test_kickback_risk_clamped_to_one
+0.00s teardown run_h4_unit_tests.py::test_chain_congestion_heuristic_non_negative
+0.00s call     run_h4_unit_tests.py::test_exchange_risk_heuristic_cost_known_exchange
+0.00s setup    run_h4_unit_tests.py::test_estimate_exchange_reliability_score_known_exchange
+0.00s teardown run_h4_unit_tests.py::test_chain_exchange_risk_heuristic_is_sum_of_parts
+0.00s call     run_h4_unit_tests.py::test_kickback_risk_zero_when_fastest_hop_slower_than_window
+0.00s teardown run_h4_unit_tests.py::test_exchange_risk_heuristic_cost_unknown_exchange_uses_fallback
+0.00s call     run_h4_unit_tests.py::test_estimate_exchange_reliability_score_known_exchange
+0.00s call     run_h4_unit_tests.py::test_kickback_risk_zero_when_no_transfer_info
+0.00s call     run_h4_unit_tests.py::test_chain_exchange_risk_heuristic_is_sum_of_parts
+0.00s teardown run_h4_unit_tests.py::test_estimate_exchange_reliability_score_known_exchange
+0.00s teardown run_h4_unit_tests.py::test_exchange_risk_respects_weight
+0.00s teardown run_h4_unit_tests.py::test_estimate_exchange_reliability_score_unknown_exchange
+0.00s setup    run_h4_unit_tests.py::test_exchange_risk_heuristic_cost_unknown_exchange_uses_fallback
+0.00s teardown run_h4_unit_tests.py::test_exchange_risk_heuristic_cost_known_exchange
+0.00s call     run_h4_unit_tests.py::test_chain_congestion_heuristic_non_negative
+0.00s call     run_h4_unit_tests.py::test_kickback_risk_clamped_to_one
+0.00s call     run_h4_unit_tests.py::test_exchange_risk_respects_weight
+0.00s setup    run_h4_unit_tests.py::test_exchange_risk_respects_weight
+0.00s call     run_h4_unit_tests.py::test_exchange_risk_heuristic_cost_unknown_exchange_uses_fallback
+0.00s setup    run_h4_unit_tests.py::test_estimate_exchange_reliability_score_unknown_exchange
+0.00s call     run_h4_unit_tests.py::test_estimate_exchange_reliability_score_unknown_exchange
+0.00s setup    run_h4_unit_tests.py::test_exchange_risk_heuristic_cost_known_exchange
+============================================================================================== 13 passed in 0.03s ===============================================================================================

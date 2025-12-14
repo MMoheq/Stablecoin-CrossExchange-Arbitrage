@@ -7,7 +7,6 @@ from __future__ import annotations
 import sys
 import logging
 import io
-import threading
 from pathlib import Path
 from typing import Optional
 
@@ -23,6 +22,7 @@ import networkx as nx            # type: ignore
 from scripts.graph import build_graph
 from scripts.data import EXCHANGES
 from scripts.astar_vol import astar_best_path_with_liquidity, PlanResult, NodeId
+from scripts.weighted_astar import weighted_astar_best_path
 from scripts.h1_vol import (
     volume_heuristic_cost,
     UNKNOWN_LIQUIDITY_PENALTY,
@@ -31,8 +31,15 @@ from scripts.h2_slippage import (
     slippage_heuristic_cost,
     UNKNOWN_SLIPPAGE_PENALTY,
 )
+from scripts.h4_chaincongestion_exchange_risk import (
+    chain_congestion_heuristic_cost,
+    exchange_risk_heuristic_cost,
+    chain_exchange_risk_heuristic_cost,
+    UNKNOWN_CHAIN_PENALTY,
+    UNKNOWN_EXCHANGE_PENALTY,
+)
 
-# Set up logging to capture A* search logs
+# Set up logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(levelname)s: %(message)s"
@@ -177,7 +184,7 @@ def make_graph_figure(G: nx.DiGraph):
 
 
 # --------------------------------------------------------------
-# Helper: run A* and format result text (with chain info)
+# Helper: run search and format result text (with risk info)
 # --------------------------------------------------------------
 
 def run_search_and_format(
@@ -187,9 +194,9 @@ def run_search_and_format(
     status_container=None,  # Streamlit container for real-time log updates
 ) -> str:
     """
-    Run A* from the selected start node and return a human-readable report.
+    Run A* / Weighted A* from the selected start node and return a human-readable report.
 
-    Uses the selected heuristic in the A* search.
+    Uses the selected heuristic in the search.
     """
     try:
         ex, coin = start_wallet.split(":")
@@ -216,21 +223,21 @@ def run_search_and_format(
             except Exception:
                 pass
 
-    # Capture logging output for both file and Streamlit
+    # Capture logging output for file / Streamlit
     log_capture = io.StringIO()
     handler = logging.StreamHandler(log_capture)
     handler.setLevel(logging.INFO)
     formatter = logging.Formatter("%(message)s")  # Simplified format
     handler.setFormatter(formatter)
 
-    # Get loggers for both astar_vol and h3_parallel modules
+    # Get loggers for search modules
     astar_logger = logging.getLogger("scripts.astar_vol")
-    astar_logger.addHandler(handler)
-    astar_logger.setLevel(logging.INFO)
-
     h3_parallel_logger = logging.getLogger("scripts.h3_parallel")
-    h3_parallel_logger.addHandler(handler)
-    h3_parallel_logger.setLevel(logging.INFO)
+    weighted_logger = logging.getLogger("scripts.weighted_astar")
+
+    for lg in (astar_logger, h3_parallel_logger, weighted_logger):
+        lg.addHandler(handler)
+        lg.setLevel(logging.INFO)
 
     # Add Streamlit handler if container provided
     streamlit_handler = None
@@ -238,21 +245,26 @@ def run_search_and_format(
         streamlit_handler = StreamlitLogHandler(status_container)
         streamlit_handler.setLevel(logging.INFO)
         streamlit_handler.setFormatter(logging.Formatter("%(message)s"))
-        # Add to both loggers so parallel search logs are captured
-        astar_logger.addHandler(streamlit_handler)
-        h3_parallel_logger.addHandler(streamlit_handler)
+        for lg in (astar_logger, h3_parallel_logger, weighted_logger):
+            lg.addHandler(streamlit_handler)
 
     try:
         # Verify heuristic parameter is being passed correctly
-        if heuristic_name not in ["h1_liquidity", "h2_slippage", "h3_parallel"]:
+        if heuristic_name not in [
+            "h1_liquidity",
+            "h2_slippage",
+            "h3_parallel",
+            "h4_chain_congestion",
+        ]:
             if streamlit_handler:
-                astar_logger.removeHandler(streamlit_handler)
-                h3_parallel_logger.removeHandler(streamlit_handler)
-            astar_logger.removeHandler(handler)
-            h3_parallel_logger.removeHandler(handler)
+                for lg in (astar_logger, h3_parallel_logger, weighted_logger):
+                    lg.removeHandler(streamlit_handler)
+            for lg in (astar_logger, h3_parallel_logger, weighted_logger):
+                lg.removeHandler(handler)
             return (
                 f"Invalid heuristic: {heuristic_name}. "
-                "Must be 'h1_liquidity', 'h2_slippage', or 'h3_parallel'."
+                "Must be 'h1_liquidity', 'h2_slippage', "
+                "'h3_parallel', or 'h4_chain_congestion'."
             )
 
         # Handle parallel search heuristic
@@ -275,8 +287,19 @@ def run_search_and_format(
                 heuristic=base_heuristic,  # Base heuristic for each parallel search
                 num_starts=3,
             )
+
+        elif heuristic_name == "h4_chain_congestion":
+            # Weighted A* with chain + exchange risk heuristic
+            result = weighted_astar_best_path(
+                start_node=start_node,
+                liquid_cash_usd=liquid_cash,
+                max_depth=6,
+                max_time_sec=1800.0,
+                min_profit_usd=0.0,
+            )
+
         else:
-            # Standard single-start search
+            # Standard single-start search for h1 / h2
             result = astar_best_path_with_liquidity(
                 start_node=start_node,
                 liquid_cash_usd=liquid_cash,
@@ -288,18 +311,18 @@ def run_search_and_format(
 
         # Clean up handlers
         if streamlit_handler:
-            astar_logger.removeHandler(streamlit_handler)
-            h3_parallel_logger.removeHandler(streamlit_handler)
-        astar_logger.removeHandler(handler)
-        h3_parallel_logger.removeHandler(handler)
+            for lg in (astar_logger, h3_parallel_logger, weighted_logger):
+                lg.removeHandler(streamlit_handler)
+        for lg in (astar_logger, h3_parallel_logger, weighted_logger):
+            lg.removeHandler(handler)
 
     except Exception as e:
         if streamlit_handler:
-            astar_logger.removeHandler(streamlit_handler)
-            h3_parallel_logger.removeHandler(streamlit_handler)
-        astar_logger.removeHandler(handler)
-        h3_parallel_logger.removeHandler(handler)
-        return f"Error while running A* search: {e}"
+            for lg in (astar_logger, h3_parallel_logger, weighted_logger):
+                lg.removeHandler(streamlit_handler)
+        for lg in (astar_logger, h3_parallel_logger, weighted_logger):
+            lg.removeHandler(handler)
+        return f"Error while running search: {e}"
 
     if result is None:
         if heuristic_name == "h3_parallel":
@@ -324,9 +347,15 @@ def run_search_and_format(
             "Max profitable current trade (Parallel search from 3 random starts):"
         )
         lines.append("Note: Searched from 3 random starting points in parallel")
+    elif heuristic_name == "h4_chain_congestion":
+        lines.append(
+            "Max profitable current trade (Weighted A* with chain + exchange risk):"
+        )
+        lines.append(f"Start node: {start_wallet}")
     else:
         lines.append(f"Max profitable current trade (A* with {heuristic_name}):")
         lines.append(f"Start node: {start_wallet}")
+
     lines.append(f"Start cash: {liquid_cash:.2f} USD")
     lines.append(f"Final cash: {result.final_cash_usd:.2f} USD")
     lines.append(f"Profit: {result.profit_usd:.2f} USD ({profit_pct:.4f}%)")
@@ -341,17 +370,14 @@ def run_search_and_format(
     lines.append("-" * 60)
 
     current_cash = liquid_cash
-    remaining_time = 1800.0  # max_time_sec from A* call
+    remaining_time = 1800.0  # max_time_sec from search call
 
     if heuristic_name == "h3_parallel":
-        # Parallel search is a meta-strategy; per-node heuristic values
-        # depend on which inner run produced the path.
         lines.append(
             "Per-node heuristic values are omitted for parallel search "
             "(multiple A* runs with a base heuristic)."
         )
     else:
-        # Only show the heuristic that is actually being used
         for i, node in enumerate(result.path):
             exchange, coin = node
             lines.append(f"  Step {i+1}: {exchange}:{coin}")
@@ -364,7 +390,6 @@ def run_search_and_format(
                     remaining_time_sec=remaining_time,
                 )
 
-                # Turn penalty into a simple label
                 if h1_val == UNKNOWN_LIQUIDITY_PENALTY:
                     label = "RISKY (no volume data)"
                 elif h1_val < 0.1:
@@ -386,7 +411,6 @@ def run_search_and_format(
                     side="buy",  # Default side
                 )
 
-                # Turn penalty into a simple label
                 if h2_val == UNKNOWN_SLIPPAGE_PENALTY:
                     label = "RISKY (no order book data)"
                 elif h2_val < 5.0:
@@ -398,6 +422,52 @@ def run_search_and_format(
 
                 lines.append(
                     f"    Slippage: {label} [penalty={h2_val:.4f}]"
+                )
+
+            elif heuristic_name == "h4_chain_congestion":
+                # Chain kickback risk
+                h_chain = chain_congestion_heuristic_cost(
+                    exchange_name=exchange,
+                    coin=coin,
+                    remaining_time_sec=remaining_time,
+                )
+
+                if h_chain == UNKNOWN_CHAIN_PENALTY:
+                    label_chain = "RISKY (no chain timing info / invalid)"
+                elif h_chain < 0.1:
+                    label_chain = "Low kickback risk (slow / conservative chain)"
+                elif h_chain < 1.0:
+                    label_chain = "Moderate kickback risk (faster chain)"
+                else:
+                    label_chain = "HIGH kickback risk (very fast chain)"
+
+                # Exchange freeze risk
+                h_exch = exchange_risk_heuristic_cost(exchange)
+
+                if h_exch == UNKNOWN_EXCHANGE_PENALTY:
+                    label_exch = "RISKY (unknown exchange)"
+                elif h_exch < 0.1:
+                    label_exch = "OK (reliable exchange)"
+                elif h_exch < 1.0:
+                    label_exch = "Moderate freeze risk"
+                else:
+                    label_exch = "HIGH freeze / shutdown risk"
+
+                # Combined penalty (what Weighted A* uses in h)
+                h_total = chain_exchange_risk_heuristic_cost(
+                    exchange_name=exchange,
+                    coin=coin,
+                    remaining_time_sec=remaining_time,
+                )
+
+                lines.append(
+                    f"    Chain risk: {label_chain} [penalty={h_chain:.4f}]"
+                )
+                lines.append(
+                    f"    Exchange risk: {label_exch} [penalty={h_exch:.4f}]"
+                )
+                lines.append(
+                    f"    Combined (h_chain + h_exchange) = {h_total:.4f}"
                 )
 
             lines.append("")
@@ -497,14 +567,15 @@ def main():
         heuristic = st.selectbox(
             "Heuristic",
             [
-                "h1_liquidity",  # volume-based heuristic
-                "h2_slippage",   # order-book slippage heuristic
-                "h3_parallel",   # parallel search from random starts
+                "h1_liquidity",        # volume-based heuristic
+                "h2_slippage",         # order-book slippage heuristic
+                "h3_parallel",         # parallel search from random starts
+                "h4_chain_congestion", # Weighted A* using chain + exchange risk
             ],
             help="Select which heuristic h(n) to use in the search.",
         )
 
-        # Start wallet selection (only shown if not using parallel search)
+        # Start wallet selection (only hidden for parallel search)
         if heuristic != "h3_parallel":
             start_wallet = st.selectbox(
                 "Starting wallet (exchange:coin)",
@@ -515,7 +586,7 @@ def main():
                 help="Node where your funds currently live.",
             )
         else:
-            # For parallel search, we don't need a starting wallet
+            # For parallel search, we don't need a specific starting wallet
             start_wallet = (
                 start_wallet_options[0] if start_wallet_options else "binance:USDT"
             )
@@ -524,10 +595,10 @@ def main():
         st.markdown("---")
         st.subheader("Max profitable current trade")
 
-        # ---- Run button: only run A* when clicked ----
+        # ---- Run button: only run search when clicked ----
         if st.button("Run search"):
             # Create a status container for real-time logging
-            with st.status("Running A* search...", expanded=True) as status:
+            with st.status("Running search...", expanded=True) as status:
                 # Create a code block for real-time log display
                 log_display = st.empty()
 
@@ -548,7 +619,6 @@ def main():
         fig = make_graph_figure(G)
         st.pyplot(fig, use_container_width=True)
 
-        # Explanation of edge colours (plain text only)
         st.markdown(
             """
             **Edge colours**

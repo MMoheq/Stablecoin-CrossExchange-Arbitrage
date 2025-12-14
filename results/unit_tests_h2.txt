@@ -1,0 +1,48 @@
+Run at 2025-12-14T13:04:16.296804+00:00
+
+============================================================================================== test session starts ==============================================================================================
+platform win32 -- Python 3.13.3, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\ariok\AppData\Local\Programs\Python\Python313\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\ariok\source\repos\cmpt417\Stable\Stablecoin-CrossExchange-Arbitrage\experiments
+plugins: anyio-4.9.0
+collecting ... collected 9 items
+
+run_h2_unit_tests.py::test_walk_order_book_exact_fill PASSED                                                                                                                                               [ 11%]
+run_h2_unit_tests.py::test_walk_order_book_partial_fill PASSED                                                                                                                                             [ 22%]
+run_h2_unit_tests.py::test_walk_order_book_empty PASSED                                                                                                                                                    [ 33%]
+run_h2_unit_tests.py::test_slippage_zero PASSED                                                                                                                                                            [ 44%]
+run_h2_unit_tests.py::test_slippage_positive_buy PASSED                                                                                                                                                    [ 55%]
+run_h2_unit_tests.py::test_slippage_none_on_invalid_book PASSED                                                                                                                                            [ 66%]
+run_h2_unit_tests.py::test_h2_unknown_order_book_penalty PASSED                                                                                                                                            [ 77%]
+run_h2_unit_tests.py::test_h2_low_slippage PASSED                                                                                                                                                          [ 88%]
+run_h2_unit_tests.py::test_h2_high_slippage PASSED                                                                                                                                                         [100%]
+
+=============================================================================================== slowest durations ===============================================================================================
+0.00s call     run_h2_unit_tests.py::test_walk_order_book_exact_fill
+0.00s setup    run_h2_unit_tests.py::test_walk_order_book_exact_fill
+0.00s setup    run_h2_unit_tests.py::test_h2_unknown_order_book_penalty
+0.00s setup    run_h2_unit_tests.py::test_h2_low_slippage
+0.00s teardown run_h2_unit_tests.py::test_walk_order_book_exact_fill
+0.00s setup    run_h2_unit_tests.py::test_h2_high_slippage
+0.00s call     run_h2_unit_tests.py::test_h2_low_slippage
+0.00s teardown run_h2_unit_tests.py::test_h2_low_slippage
+0.00s teardown run_h2_unit_tests.py::test_h2_unknown_order_book_penalty
+0.00s teardown run_h2_unit_tests.py::test_walk_order_book_partial_fill
+0.00s call     run_h2_unit_tests.py::test_walk_order_book_partial_fill
+0.00s call     run_h2_unit_tests.py::test_h2_high_slippage
+0.00s teardown run_h2_unit_tests.py::test_h2_high_slippage
+0.00s call     run_h2_unit_tests.py::test_h2_unknown_order_book_penalty
+0.00s teardown run_h2_unit_tests.py::test_slippage_none_on_invalid_book
+0.00s call     run_h2_unit_tests.py::test_slippage_zero
+0.00s setup    run_h2_unit_tests.py::test_walk_order_book_partial_fill
+0.00s teardown run_h2_unit_tests.py::test_walk_order_book_empty
+0.00s setup    run_h2_unit_tests.py::test_walk_order_book_empty
+0.00s teardown run_h2_unit_tests.py::test_slippage_zero
+0.00s call     run_h2_unit_tests.py::test_slippage_positive_buy
+0.00s call     run_h2_unit_tests.py::test_walk_order_book_empty
+0.00s setup    run_h2_unit_tests.py::test_slippage_zero
+0.00s teardown run_h2_unit_tests.py::test_slippage_positive_buy
+0.00s setup    run_h2_unit_tests.py::test_slippage_positive_buy
+0.00s call     run_h2_unit_tests.py::test_slippage_none_on_invalid_book
+0.00s setup    run_h2_unit_tests.py::test_slippage_none_on_invalid_book
+=============================================================================================== 9 passed in 0.02s ===============================================================================================
