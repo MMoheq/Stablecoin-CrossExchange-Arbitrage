@@ -13,6 +13,7 @@ streamlit run scripts/ui.py
 
 # 4) run experiments
 python experiments/monte_carlo_simulation.py
+python experiments/compare_heuristics_live.py
 python experiments/final_cash_test.py
 python experiments/test_astar_vol_toygraph.py
 python experiments/run_h1_unit_tests.py
