@@ -1,7 +1,3 @@
-# ==============================================================================
-# h4_chaincongestion_exchange_risk.py
-# — Chain congestion (kickback risk) + exchange reliability / freeze-risk
-# ==============================================================================
 
 from __future__ import annotations
 
@@ -17,28 +13,17 @@ from scripts.transfer_time import (
 # Node is (exchange, coin)
 NodeId = Tuple[str, str]
 
-# Build graph ONCE and reuse
+
 _NODES, _ADJ = build_graph()
 
-
-# ---------------------------------------------------------------------------
-# 0. Heuristic tuning parameters
-# ---------------------------------------------------------------------------
-
-# λ_chain: how much we care about "fast chain = risky"
 CHAIN_HEURISTIC_WEIGHT: float = 1.0
 
-# λ_exchange: how much we care about exchange freeze / reliability risk
 EXCHANGE_HEURISTIC_WEIGHT: float = 1.0
 
 # Fallback penalties
 UNKNOWN_CHAIN_PENALTY: float = 5.0
 UNKNOWN_EXCHANGE_PENALTY: float = 5.0
 
-
-# ---------------------------------------------------------------------------
-# 1. Chain congestion / kickback-risk model (h4-style)
-# ---------------------------------------------------------------------------
 
 def _extract_chain_name(edge: dict) -> str | None:
     """Infer blockchain/network name from an edge."""
@@ -166,11 +151,6 @@ def chain_congestion_heuristic_cost(
     penalty = CHAIN_HEURISTIC_WEIGHT * float(risk_score)
     return max(0.0, penalty)
 
-
-# ---------------------------------------------------------------------------
-# 2. Exchange reliability / freeze-risk model (h5-style)
-# ---------------------------------------------------------------------------
-
 # Scores are normalized to [0, 1].
 # Higher = more reliable (lower freeze risk).
 EXCHANGE_RELIABILITY_SCORE = {
@@ -220,10 +200,6 @@ def exchange_risk_heuristic_cost(
     penalty = EXCHANGE_HEURISTIC_WEIGHT * (1.0 - score)
     return penalty
 
-
-# ---------------------------------------------------------------------------
-# 3. Combined chain + exchange heuristic
-# ---------------------------------------------------------------------------
 
 def chain_exchange_risk_heuristic_cost(
     exchange_name: str,

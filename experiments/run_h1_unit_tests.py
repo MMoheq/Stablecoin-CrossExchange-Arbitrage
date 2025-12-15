@@ -1,6 +1,3 @@
-# ======================================================================
-# run_h1_unit_tests.py — Unit tests for h1_vol + verbose runner
-# ======================================================================
 
 from __future__ import annotations
 
@@ -10,9 +7,6 @@ import contextlib
 from pathlib import Path
 from datetime import datetime, timezone
 
-# ----------------------------------------------------------------------
-# Make repo root importable so "scripts.*" works when run from /experiments
-# ----------------------------------------------------------------------
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -20,10 +14,6 @@ if str(REPO_ROOT) not in sys.path:
 import pytest  # type: ignore
 import scripts.h1_vol as h1  # type: ignore
 
-
-# ======================================================================
-# Tests for h1_vol.volume_heuristic_cost
-# ======================================================================
 
 def test_unknown_volume_returns_penalty(monkeypatch):
     """
@@ -54,8 +44,6 @@ def test_zero_volume_returns_zero_or_low_cost():
     With zero volume, heuristic cost should not blow up; ideally zero.
     """
     cost = h1.volume_heuristic_cost("binance", "USDT", 0.0, remaining_time_sec=60.0)
-    # We *expect* zero, but if the implementation chooses a tiny penalty,
-    # this still ensures it's non-negative and small.
     assert cost >= 0.0
     assert cost == pytest.approx(cost, abs=1e-9)  # just sanity / type check
 
@@ -99,10 +87,6 @@ def test_high_volume_exceeds_threshold_if_defined(monkeypatch):
     assert above_cost >= 0.0
     assert above_cost >= below_cost
 
-
-# ======================================================================
-# Verbose runner + output logger
-# ======================================================================
 
 def main() -> None:
     results_dir = REPO_ROOT / "results"

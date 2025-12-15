@@ -1,6 +1,3 @@
-# ==============================================================
-# h3_parallel.py — Parallel search heuristic
-# ==============================================================
 
 """
 Heuristic #3: Parallel search from multiple random starting points.

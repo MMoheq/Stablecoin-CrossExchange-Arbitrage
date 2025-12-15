@@ -11,19 +11,6 @@ Units: **seconds**
 
 from typing import Optional, List, Tuple
 
-# --------------------------------------------------------------
-# 1. Base chain times (seconds)
-# --------------------------------------------------------------
-# Based directly on your notes, with reasonable single values:
-#
-# Solana (SPL):       ~1 second
-# Stellar (XLM):      3–5 seconds → use 4
-# BNB Smart Chain:    < 4 seconds → use 4
-# Tron (TRC-20):      3–5s to 1min → use 30
-# Polygon (PoS):      ~5 seconds  → use 5
-# Ethereum L2 (ARB / Base): “minutes” → use 120 (2 min)
-# Ethereum (ERC-20):  6–15 minutes → use 600 (10 min mid)
-# --------------------------------------------------------------
 
 CHAIN_TRANSFER_TIME_SEC: dict[str, float] = {
     # Fast L1s
@@ -60,13 +47,6 @@ def get_chain_time_minutes(chain: str) -> Optional[float]:
     sec = get_chain_time_seconds(chain)
     return None if sec is None else sec / 60.0
 
-# We assume that from the moment an arbitrage opportunity appears,
-# the user requires roughly 45 seconds to:
-#   - submit withdrawal requests
-#   - confirm trades
-#   - handle UI / login / switching screens
-#
-# This is a constant penalty added to every arbitrage cycle.
 BENCHMARK_USER_EXECUTION_OVERHEAD_SEC: float = 45.0 
 
 
@@ -75,17 +55,6 @@ def get_user_execution_overhead_seconds() -> float:
     return BENCHMARK_USER_EXECUTION_OVERHEAD_SEC
 
 # This allows you to compute: blockchain time + user overhead.
-#
-# transfer_hops must be a list of (from_exchange, chain) where
-# each chain is one withdrawal from one exchange to the next.
-#
-# Example:
-#   hops = [
-#       ("binance", "TRX"),   # Binance -> KuCoin via TRX
-#       ("kucoin", "ARB"),    # KuCoin -> Bybit via Arbitrum
-#   ]
-#   seconds = estimate_total_cycle_time_seconds(hops)
-# --------------------------------------------------------------
 
 def estimate_total_cycle_time_seconds(
     transfer_hops: List[Tuple[str, str]],

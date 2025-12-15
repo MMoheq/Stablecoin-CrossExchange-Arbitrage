@@ -28,9 +28,7 @@ from scripts.data import EXCHANGES
 
 
 def main() -> None:
-    # --------------------------------------
-    # 1. Build the graph from live data
-    # --------------------------------------
+
     nodes, adj = build_graph()
 
     G = nx.DiGraph()
@@ -72,10 +70,6 @@ def main() -> None:
         print("No nodes to display (probably no prices were fetched).")
         return
 
-    # --------------------------------------
-    # 2. Prepare layout + colours + labels
-    # --------------------------------------
-    # Colour nodes by exchange
     exchange_names = list(EXCHANGES.keys())
     exchange_to_idx = {ex: i for i, ex in enumerate(exchange_names)}
 
@@ -86,12 +80,7 @@ def main() -> None:
         ex = G.nodes[node]["exchange"]
         coin = G.nodes[node]["coin"]
         price = G.nodes[node]["price_usd"]
-
-        # label like:
-        #   binance:USDT
-        #   1.000350
         node_labels[node] = f"{ex}:{coin}\n{price:.6f}"
-
         idx = exchange_to_idx.get(ex, 0)
         node_colors.append(idx)
 
@@ -108,9 +97,6 @@ def main() -> None:
     # Layout
     pos = nx.spring_layout(G, seed=42, k=0.8)
 
-    # --------------------------------------
-    # 3. Draw
-    # --------------------------------------
     plt.figure(figsize=(11, 9))
     nx.draw_networkx_nodes(
         G,

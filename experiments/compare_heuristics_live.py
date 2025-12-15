@@ -9,7 +9,7 @@ import time
 import random
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Dict, Tuple, List
+from typing import Optional, Dict, Tuple, List, Any
 
 # Make sure we can import from the project root (folder that has "scripts/")
 project_root = Path(__file__).resolve().parent.parent
@@ -17,14 +17,24 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 from scripts.graph import build_graph, NodeId
-from scripts.astar_vol import astar_best_path_with_liquidity, PlanResult
+from scripts.astar_vol import (
+    astar_best_path_with_liquidity,
+    PlanResult as AStarPlanResult,
+)
 from scripts.h3_parallel import parallel_search_from_random_starts
+from scripts.weighted_astar import (
+    weighted_astar_best_path,
+    PlanResult as WeightedPlanResult,
+)
+
+# Result from either classic A* or weighted A*
+PlanLike = AStarPlanResult | WeightedPlanResult
 
 # -------------------------------------------------------------------
 # "Quick experiment" knobs (tuned so it doesn't take an hour)
 # -------------------------------------------------------------------
 QUICK_MAX_DEPTH: int = 5          # shallower search than 6
-QUICK_MAX_TIME_SEC: float = 60.0  # 1 minute cap per search
+QUICK_MAX_TIME_SEC: float = 60.0  # ≈ 1 minute cap per search (best-effort)
 QUICK_NUM_START_NODES: int = 3    # use at most 3 start nodes
 QUICK_NUM_STARTS_H3: int = 2      # parallel random starts for h3
 QUICK_CASH_LEVELS: List[float] = [1_000.0, 10_000.0, 100_000.0]
@@ -53,27 +63,33 @@ def run_single_search(
 ) -> ExperimentResult:
     """
     Run one search with a given heuristic and return a structured result.
-    For h3_parallel, start_node is ignored (can be None).
+
+    Heuristic options:
+      - "h1_liquidity"  -> astar_best_path_with_liquidity using h1
+      - "h2_slippage"   -> astar_best_path_with_liquidity using h2
+      - "h4_chaincongestion_exchange_risk" -> weighted_astar_best_path (h4+h5)
+      - "h3_parallel"   -> parallel_search_from_random_starts (wrapper over A*)
     """
     t0 = time.perf_counter()
     error: Optional[str] = None
-    result: Optional[PlanResult] = None
+    result: Optional[PlanLike] = None
 
     try:
         if heuristic == "h3_parallel":
-            # Parallel search from multiple random starts.
+            # Parallel search from multiple random starts (internally uses A* with h1).
             random.seed(42)  # small bit of reproducibility
             result = parallel_search_from_random_starts(
                 liquid_cash_usd=cash_usd,
                 max_depth=max_depth,
                 max_time_sec=max_time_sec,
                 min_profit_usd=min_profit_usd,
-                heuristic="h1_liquidity",  # base heuristic for each inner A*
+                heuristic="h1_liquidity",
                 num_starts=QUICK_NUM_STARTS_H3,
             )
-        else:
+
+        elif heuristic in ("h1_liquidity", "h2_slippage"):
             if start_node is None:
-                raise ValueError("start_node must be provided for non-h3 searches")
+                raise ValueError("start_node must be provided for h1/h2 searches")
             result = astar_best_path_with_liquidity(
                 start_node=start_node,
                 liquid_cash_usd=cash_usd,
@@ -82,6 +98,26 @@ def run_single_search(
                 min_profit_usd=min_profit_usd,
                 heuristic=heuristic,
             )
+
+        elif heuristic == "h4_chaincongestion_exchange_risk":
+            if start_node is None:
+                raise ValueError("start_node must be provided for h4 searches")
+            # Weighted A* using chain + exchange risk heuristic (h4 + h5).
+            result = weighted_astar_best_path(
+                start_node=start_node,
+                liquid_cash_usd=cash_usd,
+                max_depth=max_depth,
+                max_time_sec=max_time_sec,
+                min_profit_usd=min_profit_usd,
+            )
+
+        else:
+            raise ValueError(
+                f"Unknown heuristic: {heuristic}. Must be one of "
+                f"'h1_liquidity', 'h2_slippage', 'h3_parallel', "
+                f"'h4_chaincongestion_exchange_risk'."
+            )
+
     except Exception as e:
         error = str(e)
 
@@ -139,7 +175,7 @@ def pick_start_nodes(nodes: Dict[NodeId, dict]) -> List[NodeId]:
     return preferred[:QUICK_NUM_START_NODES]
 
 
-def main():
+def main() -> None:
     # Collect all printed lines so we can also save them to a .txt file
     logs: List[str] = []
 
@@ -160,14 +196,6 @@ def main():
 
     # Different order sizes we want to test (quick settings)
     cash_levels = QUICK_CASH_LEVELS
-
-    # For summary / clarity
-    heuristics = [
-        "h1_liquidity",
-        "h2_slippage",
-        "h4_chaincongestion_exchange_risk",
-        "h3_parallel",
-    ]
 
     all_results: List[ExperimentResult] = []
 

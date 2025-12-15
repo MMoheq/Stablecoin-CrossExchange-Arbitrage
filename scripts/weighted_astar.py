@@ -1,286 +1,267 @@
-# ==============================================================
-# compare_heuristics_live.py — quick experiments for h1, h2, h3, h4
-# ==============================================================
+# ==========================================================
+# weighted_astar.py — Weighted A* using chain + exchange risk (h4+h5)
+# ==========================================================
 
 from __future__ import annotations
 
-import sys
-import time
-import random
+import heapq
+import logging
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Optional, Dict, Tuple, List, Any
+from math import exp
+from typing import Any, Dict, List, Optional, Tuple
 
-# Make sure we can import from the project root (folder that has "scripts/")
-project_root = Path(__file__).resolve().parent.parent
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
+from scripts.graph import build_graph
+from scripts.h4_chaincongestion_exchange_risk import (
+    estimate_chain_kickback_risk_score,
+    chain_exchange_risk_heuristic_cost,
+)
 
-from scripts.graph import build_graph, NodeId
-from scripts.astar_vol import astar_best_path_with_liquidity, PlanResult as AStarPlanResult
-from scripts.h3_parallel import parallel_search_from_random_starts
-from scripts.weighted_astar import weighted_astar_best_path, PlanResult as WeightedPlanResult
+logger = logging.getLogger(__name__)
 
-PlanLike = AStarPlanResult | WeightedPlanResult
+# Node is ("binance", "USDT")
+NodeId = Tuple[str, str]
 
-# -------------------------------------------------------------------
-# "Quick experiment" knobs (tuned so it doesn't take an hour)
-# -------------------------------------------------------------------
-QUICK_MAX_DEPTH: int = 5          # shallower search than 6
-QUICK_MAX_TIME_SEC: float = 60.0  # 1 minute cap per search (best effort)
-QUICK_NUM_START_NODES: int = 3    # use at most 3 start nodes
-QUICK_NUM_STARTS_H3: int = 2      # parallel random starts for h3
-QUICK_CASH_LEVELS: List[float] = [1_000.0, 10_000.0, 100_000.0]
+
+@dataclass(frozen=True)
+class SearchState:
+    node: NodeId
+    depth: int
+    elapsed_sec: float  # total time spent along this path so far
 
 
 @dataclass
-class ExperimentResult:
-    heuristic: str
-    start_node: Optional[NodeId]  # None for h3_parallel
-    cash_usd: float
-    final_cash_usd: Optional[float]
-    profit_usd: Optional[float]
-    path_len: Optional[int]
-    duration_sec: float
-    success: bool
-    error: Optional[str]
+class PlanResult:
+    path: List[NodeId]              # sequence of nodes
+    edges: List[Dict[str, Any]]     # sequence of edge dicts
+    final_cash_usd: float
+    profit_usd: float
 
 
-def run_single_search(
-    heuristic: str,
-    cash_usd: float,
-    start_node: Optional[NodeId] = None,
-    max_depth: int = QUICK_MAX_DEPTH,
-    max_time_sec: float = QUICK_MAX_TIME_SEC,
+# ------------------------------------------------------
+# Helper: log-cost → final cash
+# ------------------------------------------------------
+
+def _final_cash_from_log_cost(
+    initial_cash_usd: float,
+    total_log_cost: float,
+) -> float:
+    return initial_cash_usd * exp(-total_log_cost)
+
+
+# ------------------------------------------------------
+# Weighted A* parameters for chain component
+# ------------------------------------------------------
+
+# These control how strongly we scale the chain-related heuristic
+# based on "how fast" a chain is.
+#
+# Design:
+#   - Fast chains (short transfer time, high kickback risk) ⇒ HIGHER weight
+#   - Slow chains (longer transfer time) ⇒ LOWER weight
+MIN_CHAIN_WEIGHT: float = 1.0
+MAX_CHAIN_WEIGHT: float = 3.0
+
+
+def _compute_chain_weight_from_risk(risk: float) -> float:
+    """
+    Map risk in [0,1] → W_chain in [MIN_CHAIN_WEIGHT, MAX_CHAIN_WEIGHT].
+
+    Higher risk (fast chain) ⇒ higher W_chain.
+    """
+    if risk < 0.0:
+        risk = 0.0
+    elif risk > 1.0:
+        risk = 1.0
+
+    w = MIN_CHAIN_WEIGHT + (MAX_CHAIN_WEIGHT - MIN_CHAIN_WEIGHT) * risk
+    return max(MIN_CHAIN_WEIGHT, min(MAX_CHAIN_WEIGHT, w))
+
+
+# ------------------------------------------------------
+# Weighted A* using chain + exchange risk heuristic
+# ------------------------------------------------------
+
+def weighted_astar_best_path(
+    start_node: NodeId,
+    liquid_cash_usd: float,
+    max_depth: int = 6,
+    max_time_sec: float = 1800.0,   # 30 minutes by default
     min_profit_usd: float = 0.0,
-) -> ExperimentResult:
+) -> Optional[PlanResult]:
     """
-    Run one search with a given heuristic and return a structured result.
+    Weighted A* search over the arbitrage graph that:
 
-    Heuristic options:
-      - "h1_liquidity"  -> astar_best_path_with_liquidity using h1
-      - "h2_slippage"   -> astar_best_path_with_liquidity using h2
-      - "h4_chaincongestion_exchange_risk" -> weighted_astar_best_path (h4+h5)
-      - "h3_parallel"   -> parallel_search_from_random_starts (wrapper over A*)
+      * Starts at `start_node` with `liquid_cash_usd` (USD value).
+      * Uses edge["rate"] / edge["cost"] from graph.py
+        (these already encode spreads + taker/withdrawal fees).
+      * Uses edge["transfer_time_sec"] for timing.
+      * Uses a combined heuristic h(n) = h_chain(n) + h_exchange(n):
+          - h_chain: penalizes FAST chains (kickback / timing risk)
+          - h_exchange: penalizes risky exchanges (freeze / halt risk)
+      * Applies a node-specific weight W_chain that depends only on
+        chain kickback risk (fast chain ⇒ higher W_chain).
+      * Treats ANY reachable node as a potential destination.
+      * Picks the path with the highest final USD value.
     """
-    t0 = time.perf_counter()
-    error: Optional[str] = None
-    result: Optional[PlanLike] = None
 
-    try:
-        if heuristic == "h3_parallel":
-            # Parallel search from multiple random starts (internally uses A*).
-            random.seed(42)  # small bit of reproducibility
-            result = parallel_search_from_random_starts(
-                liquid_cash_usd=cash_usd,
-                max_depth=max_depth,
-                max_time_sec=max_time_sec,
-                min_profit_usd=min_profit_usd,
-                heuristic="h1_liquidity",  # base heuristic
-                num_starts=QUICK_NUM_STARTS_H3,
-            )
+    # Build graph (nodes: metadata; adj: adjacency list)
+    nodes, adj = build_graph()
 
-        elif heuristic in ("h1_liquidity", "h2_slippage"):
-            if start_node is None:
-                raise ValueError("start_node must be provided for h1/h2 searches")
-            result = astar_best_path_with_liquidity(
-                start_node=start_node,
-                liquid_cash_usd=cash_usd,
-                max_depth=max_depth,
-                max_time_sec=max_time_sec,
-                min_profit_usd=min_profit_usd,
-                heuristic=heuristic,
-            )
+    if start_node not in nodes:
+        raise ValueError(f"Start node {start_node} not present in graph.")
 
-        elif heuristic == "h4_chaincongestion_exchange_risk":
-            if start_node is None:
-                raise ValueError("start_node must be provided for h4 searches")
-            # Use Weighted A* for chain + exchange risk (h4+h5)
-            result = weighted_astar_best_path(
-                start_node=start_node,
-                liquid_cash_usd=cash_usd,
-                max_depth=max_depth,
-                max_time_sec=max_time_sec,
-                min_profit_usd=min_profit_usd,
-            )
+    # Priority queue entries:
+    #   (f_score, g_score, counter, SearchState, path_nodes, path_edges)
+    start_state = SearchState(node=start_node, depth=0, elapsed_sec=0.0)
+    start_g = 0.0
 
-        else:
-            raise ValueError(
-                f"Unknown heuristic: {heuristic}. Must be one of "
-                f"'h1_liquidity', 'h2_slippage', 'h3_parallel', "
-                f"'h4_chaincongestion_exchange_risk'."
-            )
-
-    except Exception as e:
-        error = str(e)
-
-    duration = time.perf_counter() - t0
-
-    if result is None:
-        return ExperimentResult(
-            heuristic=heuristic,
-            start_node=start_node,
-            cash_usd=cash_usd,
-            final_cash_usd=None,
-            profit_usd=None,
-            path_len=None,
-            duration_sec=duration,
-            success=False,
-            error=error or "No profitable path found",
-        )
-
-    profit = result.final_cash_usd - cash_usd
-
-    return ExperimentResult(
-        heuristic=heuristic,
-        start_node=start_node,
-        cash_usd=cash_usd,
-        final_cash_usd=result.final_cash_usd,
-        profit_usd=profit,
-        path_len=len(result.path),
-        duration_sec=duration,
-        success=True,
-        error=None,
+    logger.info("Weighted A* search starting with chain+exchange risk heuristic (h4+h5)")
+    logger.info(
+        f"Start node: {start_node}, liquid_cash: ${liquid_cash_usd:.2f}, "
+        f"max_time_sec={max_time_sec}"
     )
 
+    # Initial heuristic (remaining time is the full budget at start)
+    start_remaining_time = max_time_sec
 
-def pick_start_nodes(nodes: Dict[NodeId, dict]) -> List[NodeId]:
-    """
-    Choose a small, fixed set of interesting start nodes for experiments.
-    Prefers binance:BUSD, binance:USDT, kraken:USDT if present,
-    then fills with a few random ones.
-    """
-    preferred: List[NodeId] = []
-    candidates = set(nodes.keys())
+    # Chain risk used for weighting
+    start_chain_risk = estimate_chain_kickback_risk_score(
+        exchange_name=start_node[0],
+        coin=start_node[1],
+        remaining_time_sec=start_remaining_time,
+    )
 
-    for ex, coin in [("binance", "BUSD"), ("binance", "USDT"), ("kraken", "USDT")]:
-        node = (ex, coin)
-        if node in candidates:
-            preferred.append(node)
-            candidates.remove(node)
+    # Combined heuristic: chain + exchange risk
+    start_h = chain_exchange_risk_heuristic_cost(
+        exchange_name=start_node[0],
+        coin=start_node[1],
+        remaining_time_sec=start_remaining_time,
+    )
 
-    # Add up to 2 random additional nodes to diversify
-    extra = list(candidates)
-    random.shuffle(extra)
-    preferred.extend(extra[:2])
+    start_W = _compute_chain_weight_from_risk(start_chain_risk)
+    start_f = start_g + start_W * start_h
 
-    # Limit to "quick" number of start nodes
-    return preferred[:QUICK_NUM_START_NODES]
+    logger.info(
+        f"Start node: chain_risk={start_chain_risk:.6f}, "
+        f"h_combined={start_h:.6f}, W_chain={start_W:.3f}, f={start_f:.6f}"
+    )
 
+    frontier: List[
+        Tuple[float, float, int, SearchState, List[NodeId], List[Dict[str, Any]]]
+    ] = []
 
-def main():
-    # Collect all printed lines so we can also save them to a .txt file
-    logs: List[str] = []
+    counter = 0
+    heapq.heappush(frontier, (start_f, start_g, counter, start_state, [start_node], []))
+    counter += 1
 
-    def log(msg: str = "") -> None:
-        """Print to console and also store in logs list."""
-        print(msg)
-        logs.append(msg)
+    # For pruning: best (lowest) g_score we've seen for (node, depth)
+    best_g_seen: Dict[Tuple[NodeId, int], float] = {(start_node, 0): start_g}
 
-    log("=== Building graph ===")
-    nodes, _ = build_graph()
-    log(f"Graph has {len(nodes)} nodes")
+    best_result: Optional[PlanResult] = None
 
-    # Choose starting nodes for h1/h2/h4 experiments
-    start_nodes = pick_start_nodes(nodes)
-    log("\nUsing start nodes:")
-    for n in start_nodes:
-        log(f"  - {n[0]}:{n[1]}")
+    while frontier:
+        f_score, g_score, _, state, path_nodes, path_edges = heapq.heappop(frontier)
+        current_node = state.node
 
-    # Different order sizes we want to test (quick settings)
-    cash_levels = QUICK_CASH_LEVELS
+        # Recompute current cash in USD from g_score
+        current_cash = _final_cash_from_log_cost(liquid_cash_usd, g_score)
 
-    all_results: List[ExperimentResult] = []
+        # Record this as a candidate destination (unless it's the trivial start state)
+        if state.depth > 0:
+            final_cash = current_cash
+            profit = final_cash - liquid_cash_usd
 
-    # ---- Run experiments ----
-    for cash in cash_levels:
-        log("\n============================")
-        log(f"Order size: ${cash:,.2f}")
-        log("============================")
-
-        # h1 + h2 + h4: run for each start node
-        for start in start_nodes:
-            for h in ["h1_liquidity", "h2_slippage", "h4_chaincongestion_exchange_risk"]:
-                log(f"\nRunning {h} from {start[0]}:{start[1]} ...")
-                res = run_single_search(
-                    heuristic=h,
-                    cash_usd=cash,
-                    start_node=start,
-                )
-                all_results.append(res)
-
-                if res.success:
-                    log(
-                        f"  SUCCESS: final=${res.final_cash_usd:.2f} "
-                        f"(profit=${res.profit_usd:.2f}), "
-                        f"path_len={res.path_len}, "
-                        f"time={res.duration_sec:.3f}s"
+            if final_cash > liquid_cash_usd and profit >= min_profit_usd:
+                if best_result is None or final_cash > best_result.final_cash_usd:
+                    best_result = PlanResult(
+                        path=path_nodes.copy(),
+                        edges=path_edges.copy(),
+                        final_cash_usd=final_cash,
+                        profit_usd=profit,
                     )
-                else:
-                    log(
-                        f"  FAIL: {res.error} "
-                        f"(time={res.duration_sec:.3f}s)"
+                    logger.info(
+                        "New best path found (Weighted A* h4+h5): "
+                        f"profit=${profit:.2f}, path_length={len(path_nodes)}, "
+                        f"path={' -> '.join(f'{ex}:{c}' for (ex, c) in path_nodes)}"
                     )
 
-        # h3_parallel: start nodes are chosen inside the function
-        log("\nRunning h3_parallel (random starts) ...")
-        res_parallel = run_single_search(
-            heuristic="h3_parallel",
-            cash_usd=cash,
-            start_node=None,
-        )
-        all_results.append(res_parallel)
+        # Stop expanding if depth/time limits reached
+        if state.depth >= max_depth or state.elapsed_sec >= max_time_sec:
+            continue
 
-        if res_parallel.success:
-            log(
-                f"  h3_parallel SUCCESS: final=${res_parallel.final_cash_usd:.2f} "
-                f"(profit=${res_parallel.profit_usd:.2f}), "
-                f"path_len={res_parallel.path_len}, "
-                f"time={res_parallel.duration_sec:.3f}s"
+        # Expand neighbors
+        for edge in adj.get(current_node, []):
+            to_node: NodeId = edge["to"]
+
+            # Time update
+            dt = float(edge.get("transfer_time_sec", 0.0))
+            new_elapsed = state.elapsed_sec + dt
+            if new_elapsed > max_time_sec:
+                continue
+
+            # Cost update (graph.py gives us cost = -log(rate))
+            edge_cost = float(edge.get("cost", 0.0))
+            new_g = g_score + edge_cost
+            new_depth = state.depth + 1
+            new_state = SearchState(node=to_node, depth=new_depth, elapsed_sec=new_elapsed)
+
+            key = (to_node, new_depth)
+
+            if key in best_g_seen and new_g >= best_g_seen[key]:
+                continue
+            best_g_seen[key] = new_g
+
+            # Remaining time budget
+            remaining_time = max_time_sec - new_elapsed
+
+            # Chain risk (fast = higher risk) — used for the weight
+            chain_risk = estimate_chain_kickback_risk_score(
+                exchange_name=to_node[0],
+                coin=to_node[1],
+                remaining_time_sec=remaining_time,
             )
-        else:
-            log(
-                f"  h3_parallel FAIL: {res_parallel.error} "
-                f"(time={res_parallel.duration_sec:.3f}s)"
+
+            # Combined heuristic: chain + exchange risk
+            h = chain_exchange_risk_heuristic_cost(
+                exchange_name=to_node[0],
+                coin=to_node[1],
+                remaining_time_sec=remaining_time,
             )
 
-    # ---- Compact summary at the end ----
-    log("\n\n================ SUMMARY ================")
-    for res in all_results:
-        start_str = (
-            "random_parallel"
-            if res.start_node is None
-            else f"{res.start_node[0]}:{res.start_node[1]}"
-        )
-        status = "OK" if res.success else "FAIL"
-        final_str = (
-            f"${res.final_cash_usd:.2f}"
-            if res.final_cash_usd is not None
-            else "N/A"
-        )
-        profit_str = (
-            f"${res.profit_usd:.2f}"
-            if res.profit_usd is not None
-            else "N/A"
-        )
-        log(
-            f"[{status}] h={res.heuristic:30s} "
-            f"start={start_str:18s} "
-            f"cash=${res.cash_usd:9,.2f} "
-            f"final={final_str:10s} "
-            f"profit={profit_str:10s} "
-            f"len={str(res.path_len):>3s} "
-            f"time={res.duration_sec:6.3f}s"
-        )
+            # Node-specific chain weight from chain risk
+            W_chain = _compute_chain_weight_from_risk(chain_risk)
 
-    # ---- Write logs to results/compare_heuristics_live.txt ----
-    results_dir = project_root / "results"
-    results_dir.mkdir(exist_ok=True)
-    out_path = results_dir / "compare_heuristics_live.txt"
+            f = new_g + W_chain * h
 
-    out_path.write_text("\n".join(logs) + "\n", encoding="utf-8")
-    log(f"\nSaved experiment log to: {out_path}")
+            logger.debug(
+                f"  Neighbor {to_node[0]}:{to_node[1]}: "
+                f"g={new_g:.6f}, chain_risk={chain_risk:.6f}, "
+                f"h_combined={h:.6f}, W_chain={W_chain:.3f}, "
+                f"f={f:.6f}, remaining_time={remaining_time:.1f}s"
+            )
+
+            new_path_nodes = path_nodes + [to_node]
+            new_path_edges = path_edges + [edge]
+
+            heapq.heappush(
+                frontier,
+                (f, new_g, counter, new_state, new_path_nodes, new_path_edges),
+            )
+            counter += 1
+
+    if best_result is None:
+        logger.info("Weighted A* (h4+h5) completed: No profitable path found")
+        return None
+
+    logger.info(
+        "Weighted A* (h4+h5) completed: "
+        f"Final profit=${best_result.profit_usd:.2f}, "
+        f"path_length={len(best_result.path)}, "
+        f"path={' -> '.join(f'{ex}:{c}' for ex, c in best_result.path)}"
+    )
+    return best_result
 
 
 if __name__ == "__main__":
-    main()
+    # Optional quick smoke test or just leave empty
+    pass

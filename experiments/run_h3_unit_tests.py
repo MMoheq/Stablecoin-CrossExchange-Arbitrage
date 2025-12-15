@@ -1,19 +1,11 @@
-# ======================================================================
-# run_h3_unit_tests.py / test_h3_parallel.py
-# — Unit tests for the parallel search heuristic + verbose runner
-# ======================================================================
 
 from __future__ import annotations
-
 import sys
 import io
 import contextlib
 from pathlib import Path
 from datetime import datetime, timezone
 
-# ----------------------------------------------------------------------
-# Make repo root importable so "scripts.*" works when run from /experiments
-# ----------------------------------------------------------------------
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -21,10 +13,6 @@ if str(REPO_ROOT) not in sys.path:
 import pytest  # type: ignore
 from scripts.h3_parallel import parallel_search_from_random_starts
 
-
-# ----------------------------------------------------------------------
-# Helpers
-# ----------------------------------------------------------------------
 
 
 class DummyResult:
@@ -34,10 +22,6 @@ class DummyResult:
         self.path = []      # not used by h3, but harmless
         self.edges = []     # same here
 
-
-# ======================================================================
-# Tests
-# ======================================================================
 
 def test_parallel_search_empty_graph(monkeypatch):
     """If build_graph returns no nodes, we should get None."""
@@ -181,10 +165,6 @@ def test_parallel_search_respects_num_starts(monkeypatch):
     assert call_count["n"] == 2
     assert isinstance(result, DummyResult)
 
-
-# ======================================================================
-# Verbose runner + output logger
-# ======================================================================
 
 def main() -> None:
     results_dir = REPO_ROOT / "results"

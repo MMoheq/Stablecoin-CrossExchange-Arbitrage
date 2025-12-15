@@ -1,6 +1,3 @@
-# ==============================================================
-# heuristic_volat.py — Liquidity / volume-based heuristic
-# ==============================================================
 
 """
 Heuristic #1: volume / liquidity on a given exchange.
@@ -31,21 +28,10 @@ from typing import Optional
 from scripts.data import EXCHANGES, COIN_MARKETS
 
 
-# --------------------------------------------------------------
-# 0. Heuristic tuning parameters
-# --------------------------------------------------------------
-# h1(n) = λ * (1 - liquidity_score)
-#   - λ controls how strongly we care about liquidity vs raw fees.
-#   - UNKNOWN_LIQUIDITY_PENALTY is used when we cannot fetch volume.
-# --------------------------------------------------------------
 
 LIQUIDITY_HEURISTIC_WEIGHT: float = 1.0   # λ, can be tuned in experiments
 UNKNOWN_LIQUIDITY_PENALTY: float = 5.0    # cost if no volume data is available
 
-
-# --------------------------------------------------------------
-# 1. Fetch 24h volume for a given market
-# --------------------------------------------------------------
 
 def get_24h_quote_volume(
     exchange_name: str,
@@ -202,10 +188,6 @@ def estimate_liquidity_score_live(
 
     return estimate_liquidity_score(vol_24h, order_notional_usd, time_window_sec)
 
-
-# --------------------------------------------------------------
-# 3. h1(n): volume-based heuristic cost for A*
-# --------------------------------------------------------------
 
 def volume_heuristic_cost(
     exchange_name: str,

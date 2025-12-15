@@ -1,0 +1,97 @@
+Monte Carlo experiments for h1, h2, h3, h4 (quick mode)
+=======================================================
+
+Number of nodes in graph: 19
+Cash levels: [1000.0, 10000.0, 100000.0]
+Heuristics: ['h1_liquidity', 'h2_slippage', 'h4_chaincongestion_exchange_risk', 'h3_parallel']
+Trials per heuristic: 10
+Max depth: 5
+Max time per search: 60.0s
+
+
+-------------------------------
+Heuristic: h1_liquidity
+-------------------------------
+Trial 001 [OK] start=bybit:USDT         cash=$100,000.00 final=$100406.97 profit=$406.97    len=  3 time=105.525s
+Trial 002 [OK] start=kraken:DAI         cash=$ 1,000.00 final=$1002.97   profit=$2.97      len=  3 time=99.964s
+Trial 003 [OK] start=bybit:USDC         cash=$ 1,000.00 final=$1003.62   profit=$3.62      len=  3 time=58.725s
+Trial 004 [OK] start=bybit:USDT         cash=$ 1,000.00 final=$1004.07   profit=$4.07      len=  3 time=79.498s
+Trial 005 [OK] start=binance:USDP       cash=$100,000.00 final=$100213.80 profit=$213.80    len=  4 time=69.711s
+Trial 006 [OK] start=kucoin:USDP        cash=$ 1,000.00 final=$1000.76   profit=$0.76      len=  2 time=57.030s
+Trial 007 [OK] start=kraken:USDT        cash=$10,000.00 final=$10041.91  profit=$41.91     len=  3 time=109.516s
+Trial 008 [OK] start=kucoin:USDT        cash=$ 1,000.00 final=$1004.22   profit=$4.22      len=  2 time=76.432s
+Trial 009 [OK] start=bybit:USDC         cash=$ 1,000.00 final=$1003.57   profit=$3.57      len=  6 time=55.387s
+Trial 010 [OK] start=binance:USDT       cash=$100,000.00 final=$100419.55 profit=$419.55    len=  3 time=105.857s
+
+-------------------------------
+Heuristic: h2_slippage
+-------------------------------
+Trial 001 [OK] start=kucoin:USDC        cash=$100,000.00 final=$100371.91 profit=$371.91    len=  2 time=66.240s
+Trial 002 [OK] start=binance:USDP       cash=$100,000.00 final=$100213.80 profit=$213.80    len=  4 time=61.119s
+Trial 003 [OK] start=bybit:USDC         cash=$10,000.00 final=$10035.68  profit=$35.68     len=  3 time=59.549s
+Trial 004 [OK] start=kucoin:USDP        cash=$10,000.00 final=$10007.57  profit=$7.57      len=  2 time=55.821s
+Trial 005 [OK] start=binance:USDT       cash=$10,000.00 final=$10041.45  profit=$41.45     len=  3 time=66.499s
+Trial 006 [FAIL] start=bybit:TUSD         cash=$ 1,000.00 final=N/A        profit=N/A        len=None time=65.433s  (error=No profitable path found)
+Trial 007 [OK] start=kraken:DAI         cash=$10,000.00 final=$10018.65  profit=$18.65     len=  3 time=96.792s
+Trial 008 [OK] start=kucoin:USDC        cash=$ 1,000.00 final=$1003.57   profit=$3.57      len=  2 time=64.334s
+Trial 009 [OK] start=bybit:USDT         cash=$10,000.00 final=$10040.70  profit=$40.70     len=  3 time=69.171s
+Trial 010 [FAIL] start=kucoin:TUSD        cash=$ 1,000.00 final=N/A        profit=N/A        len=None time=58.026s  (error=No profitable path found)
+
+-------------------------------
+Heuristic: h4_chaincongestion_exchange_risk
+-------------------------------
+Trial 001 [FAIL] start=binance:TUSD       cash=$ 1,000.00 final=N/A        profit=N/A        len=None time= 4.674s  (error=No profitable path found)
+Trial 002 [OK] start=kraken:DAI         cash=$10,000.00 final=$10018.65  profit=$18.65     len=  3 time= 5.256s
+Trial 003 [OK] start=binance:FDUSD      cash=$ 1,000.00 final=$1001.44   profit=$1.44      len=  4 time= 4.276s
+Trial 004 [OK] start=bybit:USDT         cash=$100,000.00 final=$100406.97 profit=$406.97    len=  3 time= 4.921s
+Trial 005 [OK] start=kucoin:USDT        cash=$10,000.00 final=$10041.70  profit=$41.70     len=  2 time= 4.834s
+Trial 006 [OK] start=kucoin:DAI         cash=$100,000.00 final=$100196.54 profit=$196.54    len=  2 time= 4.820s
+Trial 007 [FAIL] start=binance:TUSD       cash=$100,000.00 final=N/A        profit=N/A        len=None time= 4.110s  (error=No profitable path found)
+Trial 008 [OK] start=kucoin:USDC        cash=$100,000.00 final=$100356.78 profit=$356.78    len=  2 time= 4.691s
+Trial 009 [OK] start=kucoin:USDT        cash=$100,000.00 final=$100417.02 profit=$417.02    len=  2 time= 4.373s
+Trial 010 [OK] start=bybit:USDC         cash=$ 1,000.00 final=$1003.57   profit=$3.57      len=  3 time= 4.977s
+
+-------------------------------
+Heuristic: h3_parallel
+-------------------------------
+Trial 001 [OK] start=random_parallel    cash=$10,000.00 final=$10041.70  profit=$41.70     len=  2 time=106.074s
+Trial 002 [OK] start=random_parallel    cash=$ 1,000.00 final=$1001.87   profit=$1.87      len=  3 time=105.570s
+Trial 003 [OK] start=random_parallel    cash=$10,000.00 final=$10035.68  profit=$35.68     len=  6 time=88.404s
+Trial 004 [OK] start=random_parallel    cash=$10,000.00 final=$10035.68  profit=$35.68     len=  2 time=91.087s
+Trial 005 [OK] start=random_parallel    cash=$100,000.00 final=$100417.02 profit=$417.02    len=  2 time=116.201s
+Trial 006 [OK] start=random_parallel    cash=$100,000.00 final=$100356.78 profit=$356.78    len=  3 time=100.170s
+Trial 007 [OK] start=random_parallel    cash=$100,000.00 final=$100356.78 profit=$356.78    len=  3 time=104.144s
+Trial 008 [OK] start=random_parallel    cash=$10,000.00 final=$10018.65  profit=$18.65     len=  3 time=120.072s
+Trial 009 [OK] start=random_parallel    cash=$100,000.00 final=$100356.78 profit=$356.78    len=  3 time=88.309s
+Trial 010 [OK] start=random_parallel    cash=$100,000.00 final=$100414.01 profit=$414.01    len=  3 time=125.098s
+
+
+================= SUMMARY BY HEURISTIC =================
+
+Heuristic: h1_liquidity
+  Trials:        10
+  Successes:     10
+  Success rate:  100.00%
+  Avg profit*:   $110.1430 (over successful runs)
+  Avg runtime:   81.764s per trial
+
+Heuristic: h2_slippage
+  Trials:        10
+  Successes:     8
+  Success rate:  80.00%
+  Avg profit*:   $91.6657 (over successful runs)
+  Avg runtime:   66.298s per trial
+
+Heuristic: h4_chaincongestion_exchange_risk
+  Trials:        10
+  Successes:     8
+  Success rate:  80.00%
+  Avg profit*:   $180.3338 (over successful runs)
+  Avg runtime:   4.693s per trial
+
+Heuristic: h3_parallel
+  Trials:        10
+  Successes:     10
+  Success rate:  100.00%
+  Avg profit*:   $203.4949 (over successful runs)
+  Avg runtime:   104.513s per trial

@@ -18,6 +18,7 @@ if str(project_root) not in sys.path:
 import streamlit as st           # type: ignore
 import matplotlib.pyplot as plt  # type: ignore
 import networkx as nx            # type: ignore
+import pandas as pd              # type: ignore
 
 from scripts.graph import build_graph
 from scripts.data import EXCHANGES
@@ -38,6 +39,9 @@ from scripts.h4_chaincongestion_exchange_risk import (
     UNKNOWN_CHAIN_PENALTY,
     UNKNOWN_EXCHANGE_PENALTY,
 )
+
+# Import all fees as a module so we don't depend on exact dict names
+import scripts.fees as fees
 
 # Set up logging
 logging.basicConfig(
@@ -91,7 +95,7 @@ def build_nx_graph():
 
 
 def make_graph_figure(G: nx.DiGraph):
-    """Create a matplotlib Figure for the given NetworkX graph."""
+    """Create a matplotlib Figure for the given NetworkX graph (no edge labels)."""
     # Colours by exchange
     exchange_names = list(EXCHANGES.keys())
     exchange_to_idx = {ex: i for i, ex in enumerate(exchange_names)}
@@ -135,44 +139,6 @@ def make_graph_figure(G: nx.DiGraph):
         pos,
         labels=node_labels,
         font_size=7,
-        ax=ax,
-    )
-
-    # ---- Edge labels: only cost, split above/below to reduce overlap ----
-    edge_labels_trade: dict[tuple, str] = {}
-    edge_labels_transfer: dict[tuple, str] = {}
-
-    for u, v, data in G.edges(data=True):
-        cost = data.get("cost")
-        if cost is None:
-            continue
-
-        label = f"c={cost:.4f}"
-
-        if data.get("kind") == "trade":
-            # Blue intra-exchange trade edge
-            edge_labels_trade[(u, v)] = label
-        else:
-            # Green cross-exchange transfer edge
-            edge_labels_transfer[(u, v)] = label
-
-    # Trades: label closer to the source side of the edge
-    nx.draw_networkx_edge_labels(
-        G,
-        pos,
-        edge_labels=edge_labels_trade,
-        font_size=6,
-        label_pos=0.35,
-        ax=ax,
-    )
-
-    # Transfers: label closer to the target side of the edge
-    nx.draw_networkx_edge_labels(
-        G,
-        pos,
-        edge_labels=edge_labels_transfer,
-        font_size=6,
-        label_pos=0.65,
         ax=ax,
     )
 
@@ -537,100 +503,358 @@ def main():
     if default_start not in start_wallet_options and start_wallet_options:
         default_start = start_wallet_options[0]
 
-    # Top layout: graph + controls
-    col_graph, col_controls = st.columns([3, 1])
+    # ---------------- Tabs at the top ----------------
+    tab_graph, tab_prices, tab_fees, tab_help = st.tabs(
+        ["Arbitrage Graph", "Live Prices", "Fees", "How to Use"]
+    )
 
-    with col_controls:
-        st.subheader("Controls")
+    # ---------------- Tab 1: Graph + controls ----------------
+    with tab_graph:
+        # Top layout: graph + controls
+        col_graph, col_controls = st.columns([3, 1])
 
-        # Update prices -> rebuild the graph
-        if st.button("Update price"):
-            st.session_state["graph"] = build_nx_graph()
-            G = st.session_state["graph"]
-            st.success("Prices updated and graph rebuilt.")
+        with col_controls:
+            st.subheader("Controls")
 
-            # Refresh start wallet options in case node set changed
-            start_wallet_options[:] = sorted(
-                f"{ex}:{coin}" for (ex, coin) in G.nodes()
-            )
+            # Update prices -> rebuild the graph
+            if st.button("Update price"):
+                st.session_state["graph"] = build_nx_graph()
+                G = st.session_state["graph"]
+                st.success("Prices updated and graph rebuilt.")
 
-        # Liquid cash input
-        liquid_cash = st.number_input(
-            "Liquid cash (USD)",
-            min_value=0.0,
-            value=1000.0,
-            step=100.0,
-            help="Total capital available to allocate to a trade.",
-        )
-
-        # Heuristic dropdown
-        heuristic = st.selectbox(
-            "Heuristic",
-            [
-                "h1_liquidity",        # volume-based heuristic
-                "h2_slippage",         # order-book slippage heuristic
-                "h3_parallel",         # parallel search from random starts
-                "h4_chain_congestion", # Weighted A* using chain + exchange risk
-            ],
-            help="Select which heuristic h(n) to use in the search.",
-        )
-
-        # Start wallet selection (only hidden for parallel search)
-        if heuristic != "h3_parallel":
-            start_wallet = st.selectbox(
-                "Starting wallet (exchange:coin)",
-                options=start_wallet_options,
-                index=start_wallet_options.index(default_start)
-                if default_start in start_wallet_options
-                else 0,
-                help="Node where your funds currently live.",
-            )
-        else:
-            # For parallel search, we don't need a specific starting wallet
-            start_wallet = (
-                start_wallet_options[0] if start_wallet_options else "binance:USDT"
-            )
-            st.info("ℹ️ Parallel search will use 3 random starting points")
-
-        st.markdown("---")
-        st.subheader("Max profitable current trade")
-
-        # ---- Run button: only run search when clicked ----
-        if st.button("Run search"):
-            # Create a status container for real-time logging
-            with st.status("Running search...", expanded=True) as status:
-                # Create a code block for real-time log display
-                log_display = st.empty()
-
-                # Run search with real-time logging
-                result_text = run_search_and_format(
-                    start_wallet, liquid_cash, heuristic, status_container=log_display
+                # Refresh start wallet options in case node set changed
+                start_wallet_options[:] = sorted(
+                    f"{ex}:{coin}" for (ex, coin) in G.nodes()
                 )
 
-                # Update status when done
-                status.update(label="Search completed!", state="complete")
-                st.session_state["best_trade_text"] = result_text
+            # Liquid cash input
+            liquid_cash = st.number_input(
+                "Liquid cash (USD)",
+                min_value=0.0,
+                value=1000.0,
+                step=100.0,
+                help="Total capital available to allocate to a trade.",
+            )
 
-        # Display the last result (or the initial message)
-        st.text(st.session_state["best_trade_text"])
+            # Heuristic dropdown
+            heuristic = st.selectbox(
+                "Heuristic",
+                [
+                    "h1_liquidity",        # volume-based heuristic
+                    "h2_slippage",         # order-book slippage heuristic
+                    "h3_parallel",         # parallel search from random starts
+                    "h4_chain_congestion", # Weighted A* using chain + exchange risk
+                ],
+                help="Select which heuristic h(n) to use in the search.",
+            )
 
-    with col_graph:
-        st.subheader("Arbitrage Graph")
-        fig = make_graph_figure(G)
-        st.pyplot(fig, use_container_width=True)
+            # Start wallet selection (only hidden for parallel search)
+            if heuristic != "h3_parallel":
+                start_wallet = st.selectbox(
+                    "Starting wallet (exchange:coin)",
+                    options=start_wallet_options,
+                    index=start_wallet_options.index(default_start)
+                    if default_start in start_wallet_options
+                    else 0,
+                    help="Node where your funds currently live.",
+                )
+            else:
+                # For parallel search, we don't need a specific starting wallet
+                start_wallet = (
+                    start_wallet_options[0] if start_wallet_options else "binance:USDT"
+                )
+                st.info("Parallel search will use 3 random starting points")
+
+            st.markdown("---")
+            st.subheader("Max profitable current trade")
+
+            # ---- Run button: only run search when clicked ----
+            if st.button("Run search"):
+                # Create a status container for real-time logging
+                with st.status("Running search...", expanded=True) as status:
+                    # Create a code block for real-time log display
+                    log_display = st.empty()
+
+                    # Run search with real-time logging
+                    result_text = run_search_and_format(
+                        start_wallet, liquid_cash, heuristic, status_container=log_display
+                    )
+
+                    # Update status when done
+                    status.update(label="Search completed!", state="complete")
+                    st.session_state["best_trade_text"] = result_text
+
+            # Display the last result (or the initial message)
+            st.text(st.session_state["best_trade_text"])
+
+        with col_graph:
+            st.subheader("Arbitrage Graph")
+            fig = make_graph_figure(G)
+            st.pyplot(fig, use_container_width=True)
+
+            st.markdown(
+                """
+                **Edge colours**
+
+                • Blue — Trade edge (intra-exchange swap), cost includes taker fee.  
+                • Green — Transfer edge (cross-exchange), cost includes withdrawal fee on the chosen chain.  
+
+                Edge costs (negative log of effective rate) are still used internally by A*,
+                but are hidden here to keep the visualization readable.
+                """
+            )
+
+    # ---------------- Tab 2: Live Prices ----------------
+    with tab_prices:
+        st.subheader("Live Prices (from current graph)")
+        st.write(
+            "These are the latest prices used to build the arbitrage graph. "
+            "They ultimately come from ccxt/exchange APIs and configuration in `data.py`."
+        )
+
+        # Optional: allow refresh here as well
+        if st.button("Refresh prices", key="refresh_prices_tab"):
+            st.session_state["graph"] = build_nx_graph()
+            G = st.session_state["graph"]
+            st.success("Prices refreshed.")
+
+        price_rows = []
+        for node in G.nodes():
+            meta = G.nodes[node]
+            price_rows.append(
+                {
+                    "exchange": meta["exchange"],
+                    "coin": meta["coin"],
+                    "price_usd": meta["price_usd"],
+                    "snapshot_ts": meta["snapshot_ts"],
+                }
+            )
+
+        if price_rows:
+            df_prices = pd.DataFrame(price_rows).sort_values(
+                by=["exchange", "coin"]
+            )
+            st.dataframe(df_prices, use_container_width=True)
+        else:
+            st.info("No nodes found in the current graph.")
+
+    # ---------------- Tab 3: Fees ----------------
+    with tab_fees:
+        st.subheader("Fees from fees.py")
+
+        st.write(
+            "All upper-case fee dictionaries in `fees.py` are shown below. "
+            "Trading fees are typically percentages; withdrawal fees are per-coin "
+            "and per-chain amounts."
+        )
+
+        # Collect all dict-like globals from the fees module
+        fee_dicts = []
+        for name in dir(fees):
+            if not name.isupper():
+                continue
+            obj = getattr(fees, name)
+            if isinstance(obj, dict):
+                fee_dicts.append((name, obj))
+
+        if not fee_dicts:
+            st.warning("No fee dictionaries found in fees.py.")
+        else:
+            for name, mapping in fee_dicts:
+                nice_name = name.replace("_", " ").title()
+                st.markdown(f"### {nice_name}")
+
+                rows = []
+
+                # Special handling for withdrawal-fee dicts: they are typically
+                # nested as exchange -> coin -> chain -> fee_units
+                if name.startswith("WITHDRAWAL"):
+                    for exchange, per_coin in mapping.items():
+                        # per_coin might be dict(coin -> chain_map or fee)
+                        if isinstance(per_coin, dict):
+                            for coin, chain_map in per_coin.items():
+                                # chain_map can be dict(chain -> fee) or a direct fee
+                                if isinstance(chain_map, dict):
+                                    for chain, fee_val in chain_map.items():
+                                        rows.append(
+                                            {
+                                                "exchange": exchange,
+                                                "coin": coin,
+                                                "chain": chain,
+                                                "fee_units": fee_val,
+                                            }
+                                        )
+                                else:
+                                    rows.append(
+                                        {
+                                            "exchange": exchange,
+                                            "coin": coin,
+                                            "chain": "N/A",
+                                            "fee_units": chain_map,
+                                        }
+                                    )
+                        else:
+                            rows.append(
+                                {
+                                    "exchange": exchange,
+                                    "coin": "N/A",
+                                    "chain": "N/A",
+                                    "fee_units": per_coin,
+                                }
+                            )
+                else:
+                    # Default behavior for simple flat dicts, e.g. trading fees
+                    for k, v in mapping.items():
+                        if isinstance(v, dict):
+                            row = {"key": k}
+                            for sub_k, sub_v in v.items():
+                                row[sub_k] = sub_v
+                            rows.append(row)
+                        else:
+                            rows.append({"key": k, "value": v})
+
+                if rows:
+                    df = pd.DataFrame(rows)
+                    st.dataframe(df, use_container_width=True)
+                else:
+                    st.info(f"No data in {name}.")
+
+    # ---------------- Tab 4: How to Use ----------------
+    with tab_help:
+        st.subheader("How to Use This UI")
 
         st.markdown(
             """
-            **Edge colours**
+### Overview
 
-            • Blue — Trade edge (intra-exchange swap), cost includes taker fee.  
-            • Green — Transfer edge (cross-exchange), cost includes withdrawal fee on the chosen chain.  
+This interface helps you **visualize** the stablecoin arbitrage graph,  
+inspect **live prices** and **fees**, and run different **A\*-based searches**  
+to find the most profitable current trade route.
 
-            **Edge labels**
+The UI is organized into four tabs:
 
-            • c is the edge cost, defined as negative log of the effective rate after fees.  
-            • Taker fees and withdrawal fees are included inside that cost, even if they are not shown separately in the label.
-            """
+1. **Arbitrage Graph** – main view (graph + controls + search results)  
+2. **Live Prices** – table of the prices currently used in the graph  
+3. **Fees** – trading + withdrawal fees used in the model  
+4. **How to Use** – this help page  
+
+---
+
+### 1. Arbitrage Graph Tab
+
+**Left side: Graph**
+
+- Each **node** is a wallet: `exchange:COIN` (e.g. `binance:USDT`).  
+- Node label shows the coin’s **USD price** on that exchange.  
+- **Blue edges** = *trades* on a single exchange (swapping one stablecoin for another).  
+- **Green edges** = *transfers* between exchanges (withdrawal on a specific chain).
+
+This is the graph over which the A\* / Weighted A\* search runs.
+
+**Right side: Controls**
+
+1. **Update price**  
+   - Rebuilds the graph using the latest data from the exchanges.  
+   - Use this whenever you want a fresh snapshot of the market.
+
+2. **Liquid cash (USD)**  
+   - How much capital you pretend to have in the starting wallet.  
+   - The algorithm uses this to estimate fees, slippage, and profit.
+
+3. **Heuristic**  
+   - `h1_liquidity` – prefers routes with high trading volume / good liquidity.  
+   - `h2_slippage` – penalizes routes where large orders would move the price a lot.  
+   - `h3_parallel` – runs several A\* searches in parallel from random starting nodes.  
+   - `h4_chain_congestion` – Weighted A\* that also penalizes fast / risky chains and less reliable exchanges.
+
+4. **Starting wallet (exchange:coin)**  
+   - Where your funds are assumed to live **before** you start the route.  
+   - For `h3_parallel` this is hidden; the algorithm chooses random starts instead.
+
+5. **Run search**  
+   - Launches the selected search algorithm.  
+   - While it’s running, a status box shows streaming log messages from the search.  
+   - When finished, the “Max profitable current trade” section is updated.
+
+**Search Results Section**
+
+After you click **Run search**, you’ll see:
+
+- **Start cash / Final cash / Profit**  
+  - Shows how much your capital would grow along the best route found.  
+
+- **Route**  
+  - A list like `binance:USDT -> kucoin:USDT -> ...`  
+  - Each step is a node in the path returned by the search.
+
+- **Heuristic Values (Debug)**  
+  - For each node on the path, you see labels such as:  
+    - “OK (very liquid)” / “Moderate liquidity risk” / “RISKY (low liquidity)”  
+    - “OK (low slippage)” / “RISKY (high slippage)”  
+    - “Low kickback risk” / “HIGH freeze / shutdown risk”, etc.  
+  - This helps you understand **why** each heuristic preferred or avoided certain routes.
+
+- **Steps**  
+  - Detailed step-by-step explanation of the route:  
+    - For trades: which coin you trade into on which exchange and the taker fee.  
+    - For transfers: from which exchange to which exchange, on which chain,
+      approximate transfer time, and the withdrawal fee in coin units.
+
+---
+
+### 2. Live Prices Tab
+
+- Shows a table with one row per node in the graph:
+  - `exchange`  
+  - `coin`  
+  - `price_usd`  
+  - `snapshot_ts` (timestamp when that price was fetched)  
+
+- Use **Refresh prices** in this tab if you want to update the table and graph
+  without switching back to the main tab first.
+
+This is useful for quickly checking whether prices look reasonable before you
+trust any arbitrage route.
+
+---
+
+### 3. Fees Tab
+
+- Shows all fee dictionaries defined in `fees.py`.
+
+**Trading fees**
+
+- Displayed as simple key–value tables:
+  - `key` = exchange name  
+  - `value` = maker/taker fee expressed as a decimal (e.g. `0.001` = 0.1%)
+
+**Withdrawal fees**
+
+- Shown in a flattened table with columns:
+  - `exchange` – which exchange the withdrawal is from  
+  - `coin` – which asset you are withdrawing (e.g. `USDT`)  
+  - `chain` – blockchain / network used (e.g. `ETH`, `TRX`)  
+  - `fee_units` – fee charged in **coin units** on that chain  
+
+These are exactly the fees that are baked into the **green transfer edges** on the graph.
+
+---
+
+### 4. Tips for Interpreting Results
+
+- A route with very high profit but lots of “RISKY” labels probably relies on:
+  - low-liquidity markets  
+  - chains or exchanges with higher operational risk  
+
+- Comparing heuristics:
+  - Try running the same starting wallet and cash with different heuristics
+    to see how the route changes.  
+  - `h1_liquidity` is usually the safest baseline;  
+    `h4_chain_congestion` is more conservative about infrastructure risk.
+
+- Remember: this UI is **simulation only**.  
+  It does not place real orders or transfers funds.
+"""
         )
 
 

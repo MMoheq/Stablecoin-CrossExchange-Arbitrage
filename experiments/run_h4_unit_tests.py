@@ -1,6 +1,3 @@
-# ======================================================================
-# run_h4_unit_tests.py — improved verbose output for h4 unit tests
-# ======================================================================
 
 from __future__ import annotations
 import sys
@@ -9,9 +6,7 @@ import contextlib
 from pathlib import Path
 from datetime import datetime, timezone
 
-# ----------------------------------------------------------------------
-# Fix imports
-# ----------------------------------------------------------------------
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -19,10 +14,6 @@ if str(REPO_ROOT) not in sys.path:
 import pytest  # type: ignore
 import scripts.h4_chaincongestion_exchange_risk as h4  # noqa
 
-
-# ----------------------------------------------------------------------
-# Actual tests
-# ----------------------------------------------------------------------
 
 def _fake_fastest(sec: float):
     def _inner(node):
@@ -100,8 +91,7 @@ def test_exchange_risk_respects_weight():
 
 
 def test_chain_exchange_risk_heuristic_is_sum_of_parts(monkeypatch):
-    # Need to accept both *args and **kwargs because the real function
-    # is called with keyword arguments.
+
     monkeypatch.setattr(
         h4,
         "chain_congestion_heuristic_cost",
@@ -114,10 +104,6 @@ def test_chain_exchange_risk_heuristic_is_sum_of_parts(monkeypatch):
     )
     assert h4.chain_exchange_risk_heuristic_cost("binance", "USDT", 100) == pytest.approx(3.25)
 
-
-# ----------------------------------------------------------------------
-# Verbose runner + output logger
-# ----------------------------------------------------------------------
 
 def main():
     results_dir = REPO_ROOT / "results"

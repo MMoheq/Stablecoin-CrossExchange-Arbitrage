@@ -1,7 +1,3 @@
-# ======================================================================
-# run_h2_unit_tests.py / test_h2_slippage.py
-# — Unit tests for the slippage heuristic + verbose runner
-# ======================================================================
 
 from __future__ import annotations
 
@@ -11,9 +7,6 @@ import contextlib
 from pathlib import Path
 from datetime import datetime, timezone
 
-# ----------------------------------------------------------------------
-# Make repo root importable so "scripts.*" works when run from /experiments
-# ----------------------------------------------------------------------
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -29,18 +22,12 @@ from scripts.h2_slippage import (
 )
 
 
-# -----------------------------------------------------------
-# Helpers: Fake order books for controlled testing
-# -----------------------------------------------------------
 
 def make_orderbook(bids, asks):
     """Utility wrapper to build fake order books."""
     return {"bids": bids, "asks": asks}
 
 
-# ===========================================================
-# walk_order_book tests
-# ===========================================================
 
 def test_walk_order_book_exact_fill():
     ob = make_orderbook(
@@ -70,10 +57,6 @@ def test_walk_order_book_empty():
     assert vwap == 0
 
 
-# ===========================================================
-# compute_slippage_bps tests
-# ===========================================================
-
 def test_slippage_zero():
     """If VWAP equals mid-price ⇒ slippage = 0."""
     # Mid-price = 1.00, and we execute exactly at 1.00
@@ -102,9 +85,6 @@ def test_slippage_none_on_invalid_book():
     assert slip is None
 
 
-# ===========================================================
-# slippage_heuristic_cost tests
-# ===========================================================
 
 def test_h2_unknown_order_book_penalty(monkeypatch):
     """If fetch_order_book_for_coin returns None, heuristic returns penalty."""
@@ -177,9 +157,6 @@ def test_h2_high_slippage(monkeypatch):
     assert slip_cost == pytest.approx(expected_cost)
 
 
-# ===========================================================
-# Verbose runner + output logger
-# ===========================================================
 
 def main() -> None:
     results_dir = REPO_ROOT / "results"

@@ -1,5 +1,5 @@
 # ======================================================================
-# monte_carlo_heuristics.py — Monte Carlo experiments for h1, h2, h3
+# monte_carlo_heuristics.py — Monte Carlo experiments for h1, h2, h3, h4
 # ======================================================================
 
 from __future__ import annotations
@@ -21,8 +21,27 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 from scripts.graph import build_graph, NodeId
-from scripts.astar_vol import astar_best_path_with_liquidity, PlanResult
+from scripts.astar_vol import (
+    astar_best_path_with_liquidity,
+    PlanResult as AStarPlanResult,
+)
 from scripts.h3_parallel import parallel_search_from_random_starts
+from scripts.weighted_astar import (
+    weighted_astar_best_path,
+    PlanResult as WeightedPlanResult,
+)
+
+# Both A* and Weighted A* return a PlanResult-like object
+PlanLike = AStarPlanResult | WeightedPlanResult
+
+# ----------------------------------------------------------------------
+# "Quick" Monte Carlo knobs so it doesn't run forever
+# ----------------------------------------------------------------------
+MC_MAX_DEPTH: int = 5          # shallower search than 6
+MC_MAX_TIME_SEC: float = 60.0  # cap per search (seconds)
+MC_NUM_TRIALS: int = 10        # trials per heuristic (was 50)
+MC_NUM_STARTS_H3: int = 2      # parallel random starts for h3
+MC_CASH_LEVELS = [1_000.0, 10_000.0, 100_000.0]
 
 
 # ----------------------------------------------------------------------
@@ -50,17 +69,22 @@ def run_single_search(
     heuristic: str,
     cash_usd: float,
     start_node: Optional[NodeId] = None,
-    max_depth: int = 6,
-    max_time_sec: float = 1800.0,
+    max_depth: int = MC_MAX_DEPTH,
+    max_time_sec: float = MC_MAX_TIME_SEC,
     min_profit_usd: float = 0.0,
 ) -> MonteCarloResult:
     """
     Run one search with a given heuristic and return a structured result.
-    For h3_parallel, start_node is ignored (can be None).
+
+    Heuristic options:
+      - "h1_liquidity"  -> astar_best_path_with_liquidity using h1
+      - "h2_slippage"   -> astar_best_path_with_liquidity using h2
+      - "h4_chaincongestion_exchange_risk" -> weighted_astar_best_path (h4+h5)
+      - "h3_parallel"   -> parallel_search_from_random_starts (wrapper over A*)
     """
     t0 = time.perf_counter()
     error: Optional[str] = None
-    result: Optional[PlanResult] = None
+    result: Optional[PlanLike] = None
 
     try:
         if heuristic == "h3_parallel":
@@ -71,9 +95,10 @@ def run_single_search(
                 max_time_sec=max_time_sec,
                 min_profit_usd=min_profit_usd,
                 heuristic="h1_liquidity",  # base heuristic for inner A*
-                num_starts=3,
+                num_starts=MC_NUM_STARTS_H3,
             )
-        else:
+
+        elif heuristic in ("h1_liquidity", "h2_slippage"):
             if start_node is None:
                 raise ValueError("start_node must be provided for h1/h2 searches")
             result = astar_best_path_with_liquidity(
@@ -84,6 +109,26 @@ def run_single_search(
                 min_profit_usd=min_profit_usd,
                 heuristic=heuristic,
             )
+
+        elif heuristic == "h4_chaincongestion_exchange_risk":
+            if start_node is None:
+                raise ValueError("start_node must be provided for h4 searches")
+            # Weighted A* for chain + exchange risk (h4 + h5)
+            result = weighted_astar_best_path(
+                start_node=start_node,
+                liquid_cash_usd=cash_usd,
+                max_depth=max_depth,
+                max_time_sec=max_time_sec,
+                min_profit_usd=min_profit_usd,
+            )
+
+        else:
+            raise ValueError(
+                f"Unknown heuristic: {heuristic}. Must be one of "
+                f"'h1_liquidity', 'h2_slippage', 'h4_chaincongestion_exchange_risk', "
+                f"'h3_parallel'."
+            )
+
     except Exception as e:
         error = str(e)
 
@@ -118,7 +163,7 @@ def run_single_search(
 
 
 # ----------------------------------------------------------------------
-# Helper: pick random start node for h1/h2
+# Helper: pick random start node for h1/h2/h4
 # ----------------------------------------------------------------------
 
 def pick_random_start_node(nodes: Dict[NodeId, dict]) -> NodeId:
@@ -149,20 +194,27 @@ def main():
     results_dir.mkdir(parents=True, exist_ok=True)
     out_path = results_dir / "monte_carlo_heuristics.txt"
 
-    # Configuration of the simulation
-    NUM_TRIALS = 50  # total trials per heuristic
-    CASH_LEVELS = [1_000.0, 10_000.0, 100_000.0]
-    HEURISTICS = ["h1_liquidity", "h2_slippage", "h3_parallel"]
+    # Configuration of the simulation (quick mode)
+    NUM_TRIALS = MC_NUM_TRIALS
+    CASH_LEVELS = MC_CASH_LEVELS
+    HEURISTICS = [
+        "h1_liquidity",
+        "h2_slippage",
+        "h4_chaincongestion_exchange_risk",
+        "h3_parallel",
+    ]
 
     all_results: List[MonteCarloResult] = []
 
     with out_path.open("w", encoding="utf-8") as f:
-        f.write("Monte Carlo experiments for h1, h2, h3\n")
-        f.write("======================================\n\n")
+        f.write("Monte Carlo experiments for h1, h2, h3, h4 (quick mode)\n")
+        f.write("=======================================================\n\n")
         f.write(f"Number of nodes in graph: {num_nodes}\n")
         f.write(f"Cash levels: {CASH_LEVELS}\n")
         f.write(f"Heuristics: {HEURISTICS}\n")
-        f.write(f"Trials per heuristic: {NUM_TRIALS}\n\n")
+        f.write(f"Trials per heuristic: {NUM_TRIALS}\n")
+        f.write(f"Max depth: {MC_MAX_DEPTH}\n")
+        f.write(f"Max time per search: {MC_MAX_TIME_SEC}s\n\n")
 
         # Run Monte Carlo trials
         for h in HEURISTICS:
@@ -173,7 +225,7 @@ def main():
             for trial_idx in range(1, NUM_TRIALS + 1):
                 cash = random.choice(CASH_LEVELS)
 
-                if h in ("h1_liquidity", "h2_slippage"):
+                if h in ("h1_liquidity", "h2_slippage", "h4_chaincongestion_exchange_risk"):
                     start = pick_random_start_node(nodes)
                 else:
                     start = None  # h3_parallel chooses its own starts

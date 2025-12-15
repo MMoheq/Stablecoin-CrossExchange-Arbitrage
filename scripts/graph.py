@@ -1,6 +1,3 @@
-# ==============================================================
-# graph.py — Build arbitrage graph from CCXT + fee tables
-# ==============================================================
 
 from __future__ import annotations
 
@@ -17,13 +14,8 @@ from scripts.transfer_time import get_chain_time_seconds
 # Node is (exchange, coin)
 NodeId = Tuple[str, str]
 
-# type: adjacency list mapping node -> list of edge dicts
 Adjacency = Dict[NodeId, List[Dict[str, Any]]]
 
-
-# --------------------------------------------------------------
-# 1. Price snapshot from CCXT
-# --------------------------------------------------------------
 
 def fetch_price_snapshot() -> Tuple[Dict[NodeId, float], float]:
     """
@@ -68,10 +60,6 @@ def fetch_price_snapshot() -> Tuple[Dict[NodeId, float], float]:
 
     return prices, snapshot_ts
 
-
-# --------------------------------------------------------------
-# 2. Build trade edges (intra-exchange swaps)
-# --------------------------------------------------------------
 
 def _build_trade_edges(
     prices: Dict[NodeId, float],
@@ -137,9 +125,6 @@ def _build_trade_edges(
     return adj
 
 
-# --------------------------------------------------------------
-# 3. Build transfer edges (cross-exchange same-coin transfers)
-# --------------------------------------------------------------
 
 REFERENCE_NOTIONAL_USD: float = 10_000.0  # assumed trade size for fee impact
 
@@ -241,10 +226,6 @@ def _build_transfer_edges(
 
     return adj
 
-
-# --------------------------------------------------------------
-# 4. Public API: build full graph
-# --------------------------------------------------------------
 
 def build_graph() -> Tuple[Dict[NodeId, Dict[str, Any]], Adjacency]:
     """

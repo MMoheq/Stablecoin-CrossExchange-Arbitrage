@@ -1,11 +1,3 @@
-# ==============================================================
-# fees.py — Centralized fee configuration for all exchanges
-# ==============================================================
-
-# --------------------------------------------------------------
-# 1. Spot trading fees (taker & maker) per exchange
-# --------------------------------------------------------------
-# All values are decimal percentages, e.g. 0.001 = 0.1%
 
 TRADING_FEES_TAKER = {
     # Binance Spot — Regular user, no BNB discount
@@ -33,24 +25,10 @@ TRADING_FEES_MAKER = {
     "bybit":   0.0010,  # 0.10%
 }
 
-# --------------------------------------------------------------
-# 2. Withdrawal fees (cross-exchange transfer costs)
-# --------------------------------------------------------------
-# Structure:
-# WITHDRAWAL_FEES[exchange][symbol] = {
-#     "CHAIN": fee_in_token_units,
-#     ...
-# }
-#
-# Example:
-#  - WITHDRAWAL_FEES["binance"]["USDT"]["TRX"]  = 0.8
-#    means withdrawing USDT via TRX network on Binance costs 0.8 USDT.
-# --------------------------------------------------------------
+
 
 WITHDRAWAL_FEES = {
-    # ----------------------------------------------------------
-    # BINANCE — stablecoins + a few majors (from Binance fee page)
-    # ----------------------------------------------------------
+
     "binance": {
         # ---------- USDT ----------
         "USDT": {
@@ -85,10 +63,7 @@ WITHDRAWAL_FEES = {
         },
     },
 
-    # ----------------------------------------------------------
-    # KRAKEN — stablecoins we care about
-    # (values from the big Kraken list you pasted)
-    # ----------------------------------------------------------
+
     "kraken": {
         # ---------- USDT ----------
         "USDT": {
@@ -142,10 +117,6 @@ WITHDRAWAL_FEES = {
         },
     },
 
-    # ----------------------------------------------------------
-    # KUCOIN — from WithdrawalFees.com snapshot you pasted
-    # (we only plug *our* stablecoins)
-    # ----------------------------------------------------------
     "kucoin": {
         # ---------- USDT ----------
         "USDT": {
@@ -202,9 +173,6 @@ WITHDRAWAL_FEES = {
         },
     },
 
-    # ----------------------------------------------------------
-    # BYBIT — from WithdrawalFees.com snapshot + manual USDT
-    # ----------------------------------------------------------
     "bybit": {
         # ---------- USDT ----------
         "USDT": {
@@ -242,9 +210,7 @@ WITHDRAWAL_FEES = {
     },
 }
 
-# --------------------------------------------------------------
-# 3. Helper functions
-# --------------------------------------------------------------
+
 
 def get_taker_fee(exchange: str) -> float | None:
     """Return the taker fee (decimal)."""

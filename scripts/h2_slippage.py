@@ -1,6 +1,4 @@
-# ==============================================================
-# h2_slippage.py — Order-book slippage heuristic
-# ==============================================================
+
 
 """
 Heuristic #2: order-book depth / slippage estimation.
@@ -27,23 +25,11 @@ from typing import Optional, Tuple
 from scripts.data import EXCHANGES, COIN_MARKETS
 
 
-# --------------------------------------------------------------
-# 0. Heuristic tuning parameters
-# --------------------------------------------------------------
-# h2(n) = w_slip * max(0, slippage_bps - slippage_threshold)
-#   - w_slip controls how strongly we care about slippage vs other costs.
-#   - slippage_threshold: slippage below this is considered acceptable.
-#   - UNKNOWN_SLIPPAGE_PENALTY is used when we cannot fetch order book.
-# --------------------------------------------------------------
-
 SLIPPAGE_HEURISTIC_WEIGHT: float = 0.5  # w_slip, can be tuned
 SLIPPAGE_THRESHOLD_BPS: float = 10.0    # 0.10% = acceptable slippage
 UNKNOWN_SLIPPAGE_PENALTY: float = 50.0  # cost if no order book data
 
 
-# --------------------------------------------------------------
-# 1. Fetch order book for a given market
-# --------------------------------------------------------------
 
 def fetch_order_book(
     exchange_name: str,
@@ -97,10 +83,6 @@ def fetch_order_book_for_coin(
 
     return fetch_order_book(exchange_name, market, limit=limit)
 
-
-# --------------------------------------------------------------
-# 2. Simulate walking the book and compute slippage
-# --------------------------------------------------------------
 
 def walk_order_book(
     orderbook: dict,
@@ -239,10 +221,6 @@ def estimate_slippage_for_coin(
 
     return compute_slippage_bps(orderbook, order_size_base, side)
 
-
-# --------------------------------------------------------------
-# 3. h2(n): slippage-based heuristic cost for A*
-# --------------------------------------------------------------
 
 def slippage_heuristic_cost(
     exchange_name: str,

@@ -1,6 +1,3 @@
-# ==============================================================
-# test_astar_vol_toygraph.py — sanity test for A* on a toy graph
-# ==============================================================
 
 from __future__ import annotations
 

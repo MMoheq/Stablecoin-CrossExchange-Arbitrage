@@ -1,6 +1,3 @@
-# ==========================================================
-# astar_volat.py — A* search with volume / liquidity heuristic
-# ==========================================================
 
 from __future__ import annotations # lets the file use flexible type hints without worrying about import order.
 
@@ -94,15 +91,6 @@ def astar_best_path_with_liquidity(
     if start_node not in nodes:
         raise ValueError(f"Start node {start_node} not present in graph.")
 
-    # Priority queue entries:
-    #   (f_score, g_score, counter, SearchState, path_nodes, path_edges)
-    #
-    # g_score = sum(cost)    (cost = -log(rate), lower is better)
-    # h_score = selected heuristic (h1_liquidity or h2_slippage)
-    # f_score = g_score + h_score  (A* objective)
-    #
-    # We use a monotonically increasing integer 'counter' so that
-    # heapq never needs to compare SearchState objects directly.
     start_state = SearchState(node=start_node, depth=0, elapsed_sec=0.0)
     start_g = 0.0
 
