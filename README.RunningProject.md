@@ -9,6 +9,7 @@ pip install -r requirements.txt
 
 # 3) run Streamlit UI
 streamlit run scripts/ui.py
+- the ui normally takes a min to load at first when launched 
 
 # 4) run experiments
 python experiments/monte_carlo_simulation.py
