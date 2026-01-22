@@ -30,9 +30,14 @@ from scripts.weighted_astar import (
     weighted_astar_best_path,
     PlanResult as WeightedPlanResult,
 )
+from scripts.baseline_algorithms import (
+    simple_1hop_arbitrage,
+    simple_2hop_arbitrage,
+    PlanResult as BaselinePlanResult,
+)
 
-# Both A* and Weighted A* return a PlanResult-like object
-PlanLike = AStarPlanResult | WeightedPlanResult
+# Both A*, Weighted A*, and baseline algorithms return a PlanResult-like object
+PlanLike = AStarPlanResult | WeightedPlanResult | BaselinePlanResult
 
 # ----------------------------------------------------------------------
 # "Quick" Monte Carlo knobs so it doesn't run forever
@@ -81,6 +86,8 @@ def run_single_search(
       - "h2_slippage"   -> astar_best_path_with_liquidity using h2
       - "h4_chaincongestion_exchange_risk" -> weighted_astar_best_path (h4+h5)
       - "h3_parallel"   -> parallel_search_from_random_starts (wrapper over A*)
+      - "simple_1hop"   -> simple_1hop_arbitrage (naive 1-hop baseline)
+      - "simple_2hop"   -> simple_2hop_arbitrage (naive 2-hop baseline)
     """
     t0 = time.perf_counter()
     error: Optional[str] = None
@@ -122,11 +129,31 @@ def run_single_search(
                 min_profit_usd=min_profit_usd,
             )
 
+        elif heuristic == "simple_1hop":
+            if start_node is None:
+                raise ValueError("start_node must be provided for simple_1hop")
+            result = simple_1hop_arbitrage(
+                start_node=start_node,
+                liquid_cash_usd=cash_usd,
+                max_time_sec=max_time_sec,
+                min_profit_usd=min_profit_usd,
+            )
+
+        elif heuristic == "simple_2hop":
+            if start_node is None:
+                raise ValueError("start_node must be provided for simple_2hop")
+            result = simple_2hop_arbitrage(
+                start_node=start_node,
+                liquid_cash_usd=cash_usd,
+                max_time_sec=max_time_sec,
+                min_profit_usd=min_profit_usd,
+            )
+
         else:
             raise ValueError(
                 f"Unknown heuristic: {heuristic}. Must be one of "
                 f"'h1_liquidity', 'h2_slippage', 'h4_chaincongestion_exchange_risk', "
-                f"'h3_parallel'."
+                f"'h3_parallel', 'simple_1hop', 'simple_2hop'."
             )
 
     except Exception as e:
@@ -202,6 +229,8 @@ def main():
         "h2_slippage",
         "h4_chaincongestion_exchange_risk",
         "h3_parallel",
+        "simple_1hop",
+        "simple_2hop",
     ]
 
     all_results: List[MonteCarloResult] = []
@@ -225,7 +254,8 @@ def main():
             for trial_idx in range(1, NUM_TRIALS + 1):
                 cash = random.choice(CASH_LEVELS)
 
-                if h in ("h1_liquidity", "h2_slippage", "h4_chaincongestion_exchange_risk"):
+                if h in ("h1_liquidity", "h2_slippage", "h4_chaincongestion_exchange_risk", 
+                         "simple_1hop", "simple_2hop"):
                     start = pick_random_start_node(nodes)
                 else:
                     start = None  # h3_parallel chooses its own starts

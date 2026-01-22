@@ -7,6 +7,8 @@ from __future__ import annotations
 import sys
 import time
 import random
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Dict, Tuple, List, Any
@@ -26,9 +28,14 @@ from scripts.weighted_astar import (
     weighted_astar_best_path,
     PlanResult as WeightedPlanResult,
 )
+from scripts.baseline_algorithms import (
+    simple_1hop_arbitrage,
+    simple_2hop_arbitrage,
+    PlanResult as BaselinePlanResult,
+)
 
-# Result from either classic A* or weighted A*
-PlanLike = AStarPlanResult | WeightedPlanResult
+# Result from either classic A*, weighted A*, or baseline algorithms
+PlanLike = AStarPlanResult | WeightedPlanResult | BaselinePlanResult
 
 # -------------------------------------------------------------------
 # "Quick experiment" knobs (tuned so it doesn't take an hour)
@@ -38,6 +45,7 @@ QUICK_MAX_TIME_SEC: float = 60.0  # ≈ 1 minute cap per search (best-effort)
 QUICK_NUM_START_NODES: int = 3    # use at most 3 start nodes
 QUICK_NUM_STARTS_H3: int = 2      # parallel random starts for h3
 QUICK_CASH_LEVELS: List[float] = [1_000.0, 10_000.0, 100_000.0]
+MAX_WORKERS: int = 8              # number of parallel threads for running searches
 
 
 @dataclass
@@ -69,6 +77,8 @@ def run_single_search(
       - "h2_slippage"   -> astar_best_path_with_liquidity using h2
       - "h4_chaincongestion_exchange_risk" -> weighted_astar_best_path (h4+h5)
       - "h3_parallel"   -> parallel_search_from_random_starts (wrapper over A*)
+      - "simple_1hop"   -> simple_1hop_arbitrage (naive 1-hop baseline)
+      - "simple_2hop"   -> simple_2hop_arbitrage (naive 2-hop baseline)
     """
     t0 = time.perf_counter()
     error: Optional[str] = None
@@ -111,11 +121,31 @@ def run_single_search(
                 min_profit_usd=min_profit_usd,
             )
 
+        elif heuristic == "simple_1hop":
+            if start_node is None:
+                raise ValueError("start_node must be provided for simple_1hop")
+            result = simple_1hop_arbitrage(
+                start_node=start_node,
+                liquid_cash_usd=cash_usd,
+                max_time_sec=max_time_sec,
+                min_profit_usd=min_profit_usd,
+            )
+
+        elif heuristic == "simple_2hop":
+            if start_node is None:
+                raise ValueError("start_node must be provided for simple_2hop")
+            result = simple_2hop_arbitrage(
+                start_node=start_node,
+                liquid_cash_usd=cash_usd,
+                max_time_sec=max_time_sec,
+                min_profit_usd=min_profit_usd,
+            )
+
         else:
             raise ValueError(
                 f"Unknown heuristic: {heuristic}. Must be one of "
                 f"'h1_liquidity', 'h2_slippage', 'h3_parallel', "
-                f"'h4_chaincongestion_exchange_risk'."
+                f"'h4_chaincongestion_exchange_risk', 'simple_1hop', 'simple_2hop'."
             )
 
     except Exception as e:
@@ -176,84 +206,127 @@ def pick_start_nodes(nodes: Dict[NodeId, dict]) -> List[NodeId]:
 
 
 def main() -> None:
-    # Collect all printed lines so we can also save them to a .txt file
-    logs: List[str] = []
-
-    def log(msg: str = "") -> None:
-        """Print to console and also store in logs list."""
+    # Setup output file with incremental writing
+    results_dir = project_root / "results"
+    results_dir.mkdir(exist_ok=True)
+    out_path = results_dir / "compare_heuristics_live.txt"
+    
+    # Thread-safe file writing
+    file_lock = threading.Lock()
+    all_results: List[ExperimentResult] = []
+    results_lock = threading.Lock()
+    
+    def log_and_write(msg: str = "", flush: bool = False) -> None:
+        """Print to console and immediately write to file (thread-safe)."""
         print(msg)
-        logs.append(msg)
-
-    log("=== Building graph ===")
+        with file_lock:
+            with out_path.open("a", encoding="utf-8") as f:
+                f.write(msg + "\n")
+                if flush:
+                    f.flush()
+    
+    # Clear previous results and write header
+    with out_path.open("w", encoding="utf-8") as f:
+        f.write("=== Heuristic Comparison Experiments ===\n")
+        f.write(f"Started: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+    
+    log_and_write("=== Building graph ===")
     nodes, _ = build_graph()
-    log(f"Graph has {len(nodes)} nodes")
+    log_and_write(f"Graph has {len(nodes)} nodes")
 
     # Choose starting nodes for h1/h2/h4 experiments
     start_nodes = pick_start_nodes(nodes)
-    log("\nUsing start nodes:")
+    log_and_write("\nUsing start nodes:")
     for n in start_nodes:
-        log(f"  - {n[0]}:{n[1]}")
+        log_and_write(f"  - {n[0]}:{n[1]}")
 
     # Different order sizes we want to test (quick settings)
     cash_levels = QUICK_CASH_LEVELS
+    
+    log_and_write(f"\nRunning with {MAX_WORKERS} parallel workers\n")
 
-    all_results: List[ExperimentResult] = []
-
-    # ---- Run experiments ----
+    # ---- Run experiments in parallel ----
     for cash in cash_levels:
-        log("\n============================")
-        log(f"Order size: ${cash:,.2f}")
-        log("============================")
+        log_and_write("\n============================")
+        log_and_write(f"Order size: ${cash:,.2f}")
+        log_and_write("============================")
 
+        # Build list of all tasks to run in parallel
+        tasks: List[Tuple[str, Optional[NodeId], float]] = []
+        
         # h1 + h2 + h4: run for each start node
         for start in start_nodes:
             for h in ["h1_liquidity", "h2_slippage", "h4_chaincongestion_exchange_risk"]:
-                log(f"\nRunning {h} from {start[0]}:{start[1]} ...")
-                res = run_single_search(
-                    heuristic=h,
-                    cash_usd=cash,
-                    start_node=start,
-                )
-                all_results.append(res)
-
-                if res.success:
-                    log(
-                        f"  SUCCESS: final=${res.final_cash_usd:.2f} "
-                        f"(profit=${res.profit_usd:.2f}), "
-                        f"path_len={res.path_len}, "
-                        f"time={res.duration_sec:.3f}s"
-                    )
-                else:
-                    log(
-                        f"  FAIL: {res.error} "
-                        f"(time={res.duration_sec:.3f}s)"
-                    )
-
+                tasks.append((h, start, cash))
+        
+        # Simple baselines: run for each start node
+        for start in start_nodes:
+            for h in ["simple_1hop", "simple_2hop"]:
+                tasks.append((h, start, cash))
+        
         # h3_parallel: start nodes are chosen inside the function
-        log("\nRunning h3_parallel (random starts) ...")
-        res_parallel = run_single_search(
-            heuristic="h3_parallel",
-            cash_usd=cash,
-            start_node=None,
-        )
-        all_results.append(res_parallel)
-
-        if res_parallel.success:
-            log(
-                f"  h3_parallel SUCCESS: final=${res_parallel.final_cash_usd:.2f} "
-                f"(profit=${res_parallel.profit_usd:.2f}), "
-                f"path_len={res_parallel.path_len}, "
-                f"time={res_parallel.duration_sec:.3f}s"
+        tasks.append(("h3_parallel", None, cash))
+        
+        # Run all tasks in parallel
+        def run_task(heuristic: str, start: Optional[NodeId], cash_val: float) -> ExperimentResult:
+            """Wrapper function for parallel execution."""
+            start_str = (
+                "random_parallel"
+                if start is None
+                else f"{start[0]}:{start[1]}"
             )
-        else:
-            log(
-                f"  h3_parallel FAIL: {res_parallel.error} "
-                f"(time={res_parallel.duration_sec:.3f}s)"
+            log_and_write(f"\n[START] Running {heuristic} from {start_str} (cash=${cash_val:,.2f}) ...", flush=True)
+            
+            res = run_single_search(
+                heuristic=heuristic,
+                cash_usd=cash_val,
+                start_node=start,
             )
+            
+            # Thread-safe result storage
+            with results_lock:
+                all_results.append(res)
+            
+            # Log result immediately
+            if res.success:
+                log_and_write(
+                    f"[DONE] {heuristic} from {start_str}: SUCCESS - "
+                    f"final=${res.final_cash_usd:.2f} "
+                    f"(profit=${res.profit_usd:.2f}), "
+                    f"path_len={res.path_len}, "
+                    f"time={res.duration_sec:.3f}s",
+                    flush=True
+                )
+            else:
+                log_and_write(
+                    f"[DONE] {heuristic} from {start_str}: FAIL - {res.error} "
+                    f"(time={res.duration_sec:.3f}s)",
+                    flush=True
+                )
+            
+            return res
+        
+        # Execute all tasks in parallel
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            futures = {
+                executor.submit(run_task, h, start, cash): (h, start, cash)
+                for h, start, cash in tasks
+            }
+            
+            # Wait for all to complete (results are logged as they finish)
+            for future in as_completed(futures):
+                try:
+                    future.result()  # This will raise any exceptions
+                except Exception as e:
+                    heuristic, start_node, cash_val = futures[future]
+                    log_and_write(
+                        f"[ERROR] {heuristic} from {start_node}: Exception - {str(e)}",
+                        flush=True
+                    )
 
     # ---- Compact summary at the end ----
-    log("\n\n================ SUMMARY ================")
-    for res in all_results:
+    log_and_write("\n\n================ SUMMARY ================")
+    for res in sorted(all_results, key=lambda x: (x.cash_usd, x.heuristic, str(x.start_node))):
         start_str = (
             "random_parallel"
             if res.start_node is None
@@ -270,7 +343,7 @@ def main() -> None:
             if res.profit_usd is not None
             else "N/A"
         )
-        log(
+        log_and_write(
             f"[{status}] h={res.heuristic:30s} "
             f"start={start_str:18s} "
             f"cash=${res.cash_usd:9,.2f} "
@@ -279,14 +352,9 @@ def main() -> None:
             f"len={str(res.path_len):>3s} "
             f"time={res.duration_sec:6.3f}s"
         )
-
-    # ---- Write logs to results/compare_heuristics_live.txt ----
-    results_dir = project_root / "results"
-    results_dir.mkdir(exist_ok=True)
-    out_path = results_dir / "compare_heuristics_live.txt"
-
-    out_path.write_text("\n".join(logs) + "\n", encoding="utf-8")
-    log(f"\nSaved experiment log to: {out_path}")
+    
+    log_and_write(f"\nCompleted: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    log_and_write(f"\nSaved experiment log to: {out_path}")
 
 
 if __name__ == "__main__":
