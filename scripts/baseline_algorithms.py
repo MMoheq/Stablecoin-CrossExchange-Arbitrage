@@ -7,6 +7,13 @@ These algorithms serve as baselines for comparison against heuristic-guided A* s
 - breadth_first_search: Explores all paths up to depth limit
 - simple_1hop_arbitrage: Direct transfer cycle between two exchanges (same coin)
 - simple_2hop_arbitrage: Transfer A→B, trade on B, transfer back to A
+
+Related Research Baseline:
+- bellman_ford_arbitrage: Bellman-Ford algorithm for negative cycle detection
+  (see scripts/bellman_ford_arbitrage.py and docs/RELATED_RESEARCH.md)
+  This implements the methodology from Oantă & Coroiu (2023) for theoretical
+  arbitrage detection, serving as a baseline that shows what's theoretically
+  possible vs. what's executable with our execution-aware A* approach.
 """
 
 from __future__ import annotations

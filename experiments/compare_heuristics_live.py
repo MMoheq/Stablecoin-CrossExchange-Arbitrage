@@ -33,9 +33,13 @@ from scripts.baseline_algorithms import (
     simple_2hop_arbitrage,
     PlanResult as BaselinePlanResult,
 )
+from scripts.bellman_ford_arbitrage import (
+    bellman_ford_arbitrage,
+    PlanResult as BellmanFordPlanResult,
+)
 
-# Result from either classic A*, weighted A*, or baseline algorithms
-PlanLike = AStarPlanResult | WeightedPlanResult | BaselinePlanResult
+# Result from either classic A*, weighted A*, baseline algorithms, or Bellman-Ford
+PlanLike = AStarPlanResult | WeightedPlanResult | BaselinePlanResult | BellmanFordPlanResult
 
 # -------------------------------------------------------------------
 # "Quick experiment" knobs (tuned so it doesn't take an hour)
@@ -79,6 +83,7 @@ def run_single_search(
       - "h3_parallel"   -> parallel_search_from_random_starts (wrapper over A*)
       - "simple_1hop"   -> simple_1hop_arbitrage (naive 1-hop baseline)
       - "simple_2hop"   -> simple_2hop_arbitrage (naive 2-hop baseline)
+      - "bellman_ford"  -> bellman_ford_arbitrage (negative cycle detection, related research baseline)
     """
     t0 = time.perf_counter()
     error: Optional[str] = None
@@ -141,11 +146,21 @@ def run_single_search(
                 min_profit_usd=min_profit_usd,
             )
 
+        elif heuristic == "bellman_ford":
+            if start_node is None:
+                raise ValueError("start_node must be provided for bellman_ford")
+            result = bellman_ford_arbitrage(
+                start_node=start_node,
+                liquid_cash_usd=cash_usd,
+                max_time_sec=max_time_sec,
+                min_profit_usd=min_profit_usd,
+            )
+
         else:
             raise ValueError(
                 f"Unknown heuristic: {heuristic}. Must be one of "
                 f"'h1_liquidity', 'h2_slippage', 'h3_parallel', "
-                f"'h4_chaincongestion_exchange_risk', 'simple_1hop', 'simple_2hop'."
+                f"'h4_chaincongestion_exchange_risk', 'simple_1hop', 'simple_2hop', 'bellman_ford'."
             )
 
     except Exception as e:
