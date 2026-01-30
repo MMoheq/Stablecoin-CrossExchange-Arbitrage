@@ -1,0 +1,59 @@
+=== 2-Hop Max Depth Baseline Test (A* with h=0, max_depth=2) ===
+Started: 2026-01-30 12:57:17
+
+Configuration:
+  Cash: $10,000.00
+  Max depth: 2 (strict limit)
+  Max time per search: 60.0s
+  Min profit: $0.00
+  Strategy: Start → (trade within exchange) → (transfer to another exchange)
+
+=== Building graph ===
+Graph has 19 nodes
+
+Using start nodes (one per exchange):
+  - binance:USDT
+  - bybit:USDT
+  - kraken:USDT
+  - kucoin:USDT
+
+Running with 4 parallel workers
+
+
+[START] Running 2-hop max from binance:USDT (cash=$10,000.00) ...
+
+[START] Running 2-hop max from bybit:USDT (cash=$10,000.00) ...
+
+[START] Running 2-hop max from kraken:USDT (cash=$10,000.00) ...
+
+[START] Running 2-hop max from kucoin:USDT (cash=$10,000.00) ...
+[DONE] binance:USDT: SUCCESS - final=$10011.27 (profit=$11.27), path_len=3, time=15.474s
+[DONE] bybit:USDT: SUCCESS - final=$10010.52 (profit=$10.52), path_len=3, time=18.244s
+[DONE] kraken:USDT: SUCCESS - final=$10011.22 (profit=$11.22), path_len=3, time=19.237s
+[DONE] kucoin:USDT: SUCCESS - final=$10011.52 (profit=$11.52), path_len=2, time=20.563s
+
+
+================ SUMMARY ================
+
+Total tests: 4
+Successes: 4
+Failures: 0
+
+Average profit (successful): $11.14
+Average time (successful): 18.380s
+Average path length (successful): 2.75
+
+
+Detailed Results:
+[OK] start=kucoin:USDT        final=$10011.52  profit=$11.52     len=  2 time=20.563s
+         Path: (kucoin,USDT) -> (kucoin,TUSD)
+[OK] start=binance:USDT       final=$10011.27  profit=$11.27     len=  3 time=15.474s
+         Path: (binance,USDT) -> (kucoin,USDT) -> (kucoin,TUSD)
+[OK] start=kraken:USDT        final=$10011.22  profit=$11.22     len=  3 time=19.237s
+         Path: (kraken,USDT) -> (kucoin,USDT) -> (kucoin,TUSD)
+[OK] start=bybit:USDT         final=$10010.52  profit=$10.52     len=  3 time=18.244s
+         Path: (bybit,USDT) -> (kucoin,USDT) -> (kucoin,TUSD)
+
+Completed: 2026-01-30 12:58:07
+
+Results saved to: /Users/user/Desktop/CMPT417/Stablecoin-CrossExchange-Arbitrage/results/2hop_max_baseline.txt

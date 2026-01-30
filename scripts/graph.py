@@ -17,10 +17,17 @@ NodeId = Tuple[str, str]
 Adjacency = Dict[NodeId, List[Dict[str, Any]]]
 
 
+# Maximum deviation from $1.00 for a coin to be considered a stablecoin
+# Coins trading outside this range are excluded (e.g., FRAX can trade at $0.80-$0.90)
+STABLECOIN_PRICE_TOLERANCE = 0.05  # 5% tolerance: $0.95 - $1.05
+
+
 def fetch_price_snapshot() -> Tuple[Dict[NodeId, float], float]:
     """
     Fetch a snapshot of USD-normalized prices for all (exchange, coin)
     pairs where we have a configured market in data.py.
+
+    Filters out coins that deviate too far from $1.00 (not true stablecoins).
 
     Returns:
         prices:    dict[(exchange, coin)] -> price_usd
@@ -56,9 +63,48 @@ def fetch_price_snapshot() -> Tuple[Dict[NodeId, float], float]:
             if price_usd is None:
                 continue
 
+            # Filter out coins that deviate too far from $1.00
+            # These are not true stablecoins (e.g., FRAX trading at $0.82)
+            if abs(price_usd - 1.0) > STABLECOIN_PRICE_TOLERANCE:
+                continue  # Skip this coin on this exchange
+
             prices[(ex_name, coin)] = price_usd
 
     return prices, snapshot_ts
+
+
+def _fetch_actual_trading_pair_rate(
+    ex_name: str,
+    coin_from: str,
+    coin_to: str,
+) -> float | None:
+    """
+    Try to fetch the actual trading pair rate from the exchange.
+    Returns the rate (units of coin_to per 1 unit of coin_from) or None if not available.
+    """
+    ex = EXCHANGES[ex_name]
+    
+    # Try both directions
+    pairs_to_try = [
+        (f"{coin_from}/{coin_to}", False),  # Direct: base=coin_from, quote=coin_to
+        (f"{coin_to}/{coin_from}", True),     # Inverted: base=coin_to, quote=coin_from
+    ]
+    
+    for pair, needs_invert in pairs_to_try:
+        try:
+            ticker = ex.fetch_ticker(pair)
+            bid = ticker.get("bid")
+            ask = ticker.get("ask")
+            if isinstance(bid, (int, float)) and isinstance(ask, (int, float)):
+                mid = (bid + ask) / 2.0
+                if needs_invert:
+                    return 1.0 / mid  # Invert: 1 coin_from = 1/mid coin_to
+                else:
+                    return mid  # Direct: 1 coin_from = mid coin_to
+        except Exception:
+            continue
+    
+    return None
 
 
 def _build_trade_edges(
@@ -71,6 +117,10 @@ def _build_trade_edges(
         kind = "trade"
         rate = effective multiplicative factor on amount
         cost = -log(rate)
+    
+    IMPORTANT: We try to fetch actual trading pair prices first. If not available,
+    we fall back to calculating from normalized USD prices (which may introduce
+    small errors due to normalization path differences).
     """
     adj: Adjacency = defaultdict(list)
 
@@ -89,11 +139,20 @@ def _build_trade_edges(
 
                 c_from = coins_here[i]
                 c_to = coins_here[j]
-                p_from = prices[(ex_name, c_from)]  # USD per 1 c_from
-                p_to = prices[(ex_name, c_to)]      # USD per 1 c_to
+                
+                # Try to fetch actual trading pair rate first
+                actual_rate = _fetch_actual_trading_pair_rate(ex_name, c_from, c_to)
+                
+                if actual_rate is not None:
+                    # Use actual trading pair rate
+                    raw_rate = actual_rate
+                else:
+                    # Fallback: calculate from normalized USD prices
+                    # This may introduce small errors but is better than nothing
+                    p_from = prices[(ex_name, c_from)]  # USD per 1 c_from
+                    p_to = prices[(ex_name, c_to)]      # USD per 1 c_to
+                    raw_rate = p_from / p_to
 
-                # how many units of c_to for 1 unit of c_from?
-                raw_rate = p_from / p_to
                 effective_rate = raw_rate * (1.0 - taker_fee)
 
                 if effective_rate <= 0:
@@ -119,6 +178,7 @@ def _build_trade_edges(
                         "reference_amount_units": None,
                         "chain": None,
                         "transfer_time_sec": 0.0,
+                        "uses_actual_pair": actual_rate is not None,  # Flag for debugging
                     }
                 )
 

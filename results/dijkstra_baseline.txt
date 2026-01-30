@@ -1,0 +1,64 @@
+=== Dijkstra's Algorithm Baseline Test (A* with h=0) ===
+Started: 2026-01-30 12:57:15
+
+Configuration:
+  Cash: $10,000.00
+  Max depth: 6
+  Max time per search: 180.0s
+  Min profit: $0.00
+
+=== Building graph ===
+Graph has 19 nodes
+
+Using start nodes:
+  - binance:BUSD
+  - binance:USDT
+  - kraken:USDT
+  - kraken:USDC
+  - bybit:DAI
+
+Running with 4 parallel workers
+
+
+[START] Running Dijkstra from binance:USDT (cash=$10,000.00) ...
+
+[START] Running Dijkstra from binance:BUSD (cash=$10,000.00) ...
+
+[START] Running Dijkstra from kraken:USDC (cash=$10,000.00) ...
+
+[START] Running Dijkstra from kraken:USDT (cash=$10,000.00) ...
+[DONE] binance:USDT: SUCCESS - final=$10011.27 (profit=$11.27), path_len=3, time=15.439s
+
+[START] Running Dijkstra from bybit:DAI (cash=$10,000.00) ...
+[DONE] kraken:USDT: SUCCESS - final=$10011.22 (profit=$11.22), path_len=3, time=17.498s
+[DONE] kraken:USDC: SUCCESS - final=$10026.04 (profit=$26.04), path_len=3, time=19.496s
+[DONE] binance:BUSD: SUCCESS - final=$10017.77 (profit=$17.77), path_len=4, time=20.579s
+[DONE] bybit:DAI: SUCCESS - final=$10011.22 (profit=$11.22), path_len=3, time=16.551s
+
+
+================ SUMMARY ================
+
+Total tests: 5
+Successes: 5
+Failures: 0
+
+Average profit (successful): $15.51
+Average time (successful): 17.913s
+Average path length (successful): 3.20
+
+
+Detailed Results:
+[OK] start=kraken:USDC        final=$10026.04  profit=$26.04     len=  3 time=19.496s
+         Path: (kraken,USDC) -> (kucoin,USDC) -> (kucoin,TUSD)
+[OK] start=binance:BUSD       final=$10017.77  profit=$17.77     len=  4 time=20.579s
+         Path: (binance,BUSD) -> (binance,USDT) -> (kucoin,USDT) -> (kucoin,TUSD)
+[OK] start=binance:USDT       final=$10011.27  profit=$11.27     len=  3 time=15.439s
+         Path: (binance,USDT) -> (kucoin,USDT) -> (kucoin,TUSD)
+[OK] start=kraken:USDT        final=$10011.22  profit=$11.22     len=  3 time=17.498s
+         Path: (kraken,USDT) -> (kucoin,USDT) -> (kucoin,TUSD)
+[OK] start=bybit:DAI          final=$10011.22  profit=$11.22     len=  3 time=16.551s
+         Path: (bybit,DAI) -> (kucoin,DAI) -> (kucoin,TUSD)
+
+Completed: 2026-01-30 12:58:16
+
+Results saved to: /Users/user/Desktop/CMPT417/Stablecoin-CrossExchange-Arbitrage/results/dijkstra_baseline.txt
