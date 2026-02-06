@@ -234,7 +234,10 @@ def main():
     # Where to write results
     results_dir = project_root / "results"
     results_dir.mkdir(parents=True, exist_ok=True)
-    out_path = results_dir / "monte_carlo_heuristics.txt"
+    
+    # Include timestamp in filename to avoid overwriting previous results
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    out_path = results_dir / f"monte_carlo_heuristics_{timestamp}.txt"
 
     # Configuration of the simulation (quick mode)
     NUM_TRIALS = MC_NUM_TRIALS
