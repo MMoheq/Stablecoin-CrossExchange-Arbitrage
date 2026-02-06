@@ -21,6 +21,7 @@ This module:
 
 from __future__ import annotations # lets the file use flexible type hints without worrying about import order.
 
+from functools import lru_cache
 from math import log10
 from typing import Optional
 
@@ -32,6 +33,10 @@ from scripts.data import EXCHANGES, COIN_MARKETS
 LIQUIDITY_HEURISTIC_WEIGHT: float = 1.0   # λ, can be tuned in experiments
 UNKNOWN_LIQUIDITY_PENALTY: float = 5.0    # cost if no volume data is available
 
+# Cache TTL for volume data (60 seconds)
+_VOLUME_CACHE_TTL_SEC: float = 60.0
+_volume_cache: dict[tuple[str, str], tuple[float, Optional[float]]] = {}  # (exchange, market) -> (timestamp, volume)
+
 
 def get_24h_quote_volume(
     exchange_name: str,
@@ -39,6 +44,8 @@ def get_24h_quote_volume(
 ) -> Optional[float]:
     """
     Fetch the 24h quote volume for a specific symbol on an exchange.
+    
+    Uses caching to avoid repeated API calls for the same market within 60 seconds.
 
     Args:
         exchange_name: "binance", "kraken", "kucoin", "bybit", ...
@@ -50,6 +57,18 @@ def get_24h_quote_volume(
             - Falls back to baseVolume if quoteVolume is missing.
             - None if we cannot fetch a ticker or volume is missing.
     """
+    import time
+    
+    # Check cache first
+    cache_key = (exchange_name, market)
+    current_time = time.time()
+    
+    if cache_key in _volume_cache:
+        cached_time, cached_volume = _volume_cache[cache_key]
+        if (current_time - cached_time) < _VOLUME_CACHE_TTL_SEC:
+            return cached_volume
+    
+    # Cache miss or expired - fetch from API
     ex = EXCHANGES.get(exchange_name)
     if ex is None:
         return None
@@ -57,17 +76,22 @@ def get_24h_quote_volume(
     try:
         ticker = ex.fetch_ticker(market)
     except Exception:
+        # Cache the failure (None) to avoid repeated failed calls
+        _volume_cache[cache_key] = (current_time, None)
         return None
 
     qv = ticker.get("quoteVolume")
     bv = ticker.get("baseVolume")
 
+    volume = None
     if isinstance(qv, (int, float)) and qv > 0: # try quote volume first then fallback to base volume
-        return float(qv)
-    if isinstance(bv, (int, float)) and bv > 0:
-        return float(bv)
+        volume = float(qv)
+    elif isinstance(bv, (int, float)) and bv > 0:
+        volume = float(bv)
 
-    return None # return None if the 24h volume is not found
+    # Update cache
+    _volume_cache[cache_key] = (current_time, volume)
+    return volume
 
 
 def get_24h_quote_volume_for_coin(
