@@ -297,10 +297,10 @@ def run_search_and_format(
                 f"with {liquid_cash:.2f} USD using parallel search."
             )
         else:
-        return (
-            f"No profitable path found from {start_wallet} with "
-            f"{liquid_cash:.2f} USD using heuristic {heuristic_name}."
-        )
+            return (
+                f"No profitable path found from {start_wallet} with "
+                f"{liquid_cash:.2f} USD using heuristic {heuristic_name}."
+            )
 
     profit_pct = (
         (result.profit_usd / liquid_cash) * 100.0 if liquid_cash > 0 else 0.0
@@ -319,8 +319,8 @@ def run_search_and_format(
         )
         lines.append(f"Start node: {start_wallet}")
     else:
-    lines.append(f"Max profitable current trade (A* with {heuristic_name}):")
-    lines.append(f"Start node: {start_wallet}")
+        lines.append(f"Max profitable current trade (A* with {heuristic_name}):")
+        lines.append(f"Start node: {start_wallet}")
 
     lines.append(f"Start cash: {liquid_cash:.2f} USD")
     lines.append(f"Final cash: {result.final_cash_usd:.2f} USD")
@@ -510,31 +510,31 @@ def main():
 
     # ---------------- Tab 1: Graph + controls ----------------
     with tab_graph:
-    # Top layout: graph + controls
-    col_graph, col_controls = st.columns([3, 1])
+        # Top layout: graph + controls
+        col_graph, col_controls = st.columns([3, 1])
 
-    with col_controls:
-        st.subheader("Controls")
+        with col_controls:
+            st.subheader("Controls")
 
-        # Update prices -> rebuild the graph
-        if st.button("Update price"):
-            st.session_state["graph"] = build_nx_graph()
-            G = st.session_state["graph"]
-            st.success("Prices updated and graph rebuilt.")
+            # Update prices -> rebuild the graph
+            if st.button("Update price"):
+                st.session_state["graph"] = build_nx_graph()
+                G = st.session_state["graph"]
+                st.success("Prices updated and graph rebuilt.")
 
-            # Refresh start wallet options in case node set changed
+                # Refresh start wallet options in case node set changed
                 start_wallet_options[:] = sorted(
                     f"{ex}:{coin}" for (ex, coin) in G.nodes()
                 )
 
-        # Liquid cash input
-        liquid_cash = st.number_input(
-            "Liquid cash (USD)",
-            min_value=0.0,
-            value=1000.0,
-            step=100.0,
-            help="Total capital available to allocate to a trade.",
-        )
+            # Liquid cash input
+            liquid_cash = st.number_input(
+                "Liquid cash (USD)",
+                min_value=0.0,
+                value=1000.0,
+                step=100.0,
+                help="Total capital available to allocate to a trade.",
+            )
 
             # Heuristic dropdown
             heuristic = st.selectbox(
@@ -550,14 +550,14 @@ def main():
 
             # Start wallet selection (only hidden for parallel search)
             if heuristic != "h3_parallel":
-        start_wallet = st.selectbox(
-            "Starting wallet (exchange:coin)",
-            options=start_wallet_options,
-            index=start_wallet_options.index(default_start)
-            if default_start in start_wallet_options
-            else 0,
-            help="Node where your funds currently live.",
-        )
+                start_wallet = st.selectbox(
+                    "Starting wallet (exchange:coin)",
+                    options=start_wallet_options,
+                    index=start_wallet_options.index(default_start)
+                    if default_start in start_wallet_options
+                    else 0,
+                    help="Node where your funds currently live.",
+                )
             else:
                 # For parallel search, we don't need a specific starting wallet
                 start_wallet = (
@@ -568,10 +568,10 @@ def main():
         st.markdown("---")
         st.subheader("Max profitable current trade")
 
-            # ---- Run button: only run search when clicked ----
+        # ---- Run button: only run search when clicked ----
         if st.button("Run search"):
-                # Create a status container for real-time logging
-                with st.status("Running search...", expanded=True) as status:
+            # Create a status container for real-time logging
+            with st.status("Running search...", expanded=True) as status:
                     # Create a code block for real-time log display
                     log_display = st.empty()
 
