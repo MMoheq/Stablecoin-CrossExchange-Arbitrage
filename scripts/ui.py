@@ -247,7 +247,7 @@ def run_search_and_format(
 
             result: Optional[PlanResult] = parallel_search_from_random_starts(
                 liquid_cash_usd=liquid_cash,
-                max_depth=6,
+                max_depth=4,  # Reduced from 6 to 4 for faster execution
                 max_time_sec=1800.0,
                 min_profit_usd=0.0,
                 heuristic=base_heuristic,  # Base heuristic for each parallel search
@@ -257,19 +257,19 @@ def run_search_and_format(
         elif heuristic_name == "h4_chain_congestion":
             # Weighted A* with chain + exchange risk heuristic
             result = weighted_astar_best_path(
-                start_node=start_node,
-                liquid_cash_usd=liquid_cash,
-                max_depth=6,
-                max_time_sec=1800.0,
-                min_profit_usd=0.0,
-            )
+            start_node=start_node,
+            liquid_cash_usd=liquid_cash,
+                max_depth=4,  # Reduced from 6 to 4 for faster execution
+            max_time_sec=1800.0,
+            min_profit_usd=0.0,
+        )
 
         else:
             # Standard single-start search for h1 / h2
             result = astar_best_path_with_liquidity(
                 start_node=start_node,
                 liquid_cash_usd=liquid_cash,
-                max_depth=6,
+                max_depth=4,  # Reduced from 6 to 4 for faster execution
                 max_time_sec=1800.0,
                 min_profit_usd=0.0,
                 heuristic=heuristic_name,  # Pass selected heuristic to A*
@@ -297,10 +297,10 @@ def run_search_and_format(
                 f"with {liquid_cash:.2f} USD using parallel search."
             )
         else:
-            return (
-                f"No profitable path found from {start_wallet} with "
-                f"{liquid_cash:.2f} USD using heuristic {heuristic_name}."
-            )
+        return (
+            f"No profitable path found from {start_wallet} with "
+            f"{liquid_cash:.2f} USD using heuristic {heuristic_name}."
+        )
 
     profit_pct = (
         (result.profit_usd / liquid_cash) * 100.0 if liquid_cash > 0 else 0.0
@@ -319,8 +319,8 @@ def run_search_and_format(
         )
         lines.append(f"Start node: {start_wallet}")
     else:
-        lines.append(f"Max profitable current trade (A* with {heuristic_name}):")
-        lines.append(f"Start node: {start_wallet}")
+    lines.append(f"Max profitable current trade (A* with {heuristic_name}):")
+    lines.append(f"Start node: {start_wallet}")
 
     lines.append(f"Start cash: {liquid_cash:.2f} USD")
     lines.append(f"Final cash: {result.final_cash_usd:.2f} USD")
@@ -510,31 +510,31 @@ def main():
 
     # ---------------- Tab 1: Graph + controls ----------------
     with tab_graph:
-        # Top layout: graph + controls
-        col_graph, col_controls = st.columns([3, 1])
+    # Top layout: graph + controls
+    col_graph, col_controls = st.columns([3, 1])
 
-        with col_controls:
-            st.subheader("Controls")
+    with col_controls:
+        st.subheader("Controls")
 
-            # Update prices -> rebuild the graph
-            if st.button("Update price"):
-                st.session_state["graph"] = build_nx_graph()
-                G = st.session_state["graph"]
-                st.success("Prices updated and graph rebuilt.")
+        # Update prices -> rebuild the graph
+        if st.button("Update price"):
+            st.session_state["graph"] = build_nx_graph()
+            G = st.session_state["graph"]
+            st.success("Prices updated and graph rebuilt.")
 
-                # Refresh start wallet options in case node set changed
+            # Refresh start wallet options in case node set changed
                 start_wallet_options[:] = sorted(
                     f"{ex}:{coin}" for (ex, coin) in G.nodes()
                 )
 
-            # Liquid cash input
-            liquid_cash = st.number_input(
-                "Liquid cash (USD)",
-                min_value=0.0,
-                value=1000.0,
-                step=100.0,
-                help="Total capital available to allocate to a trade.",
-            )
+        # Liquid cash input
+        liquid_cash = st.number_input(
+            "Liquid cash (USD)",
+            min_value=0.0,
+            value=1000.0,
+            step=100.0,
+            help="Total capital available to allocate to a trade.",
+        )
 
             # Heuristic dropdown
             heuristic = st.selectbox(
@@ -550,14 +550,14 @@ def main():
 
             # Start wallet selection (only hidden for parallel search)
             if heuristic != "h3_parallel":
-                start_wallet = st.selectbox(
-                    "Starting wallet (exchange:coin)",
-                    options=start_wallet_options,
-                    index=start_wallet_options.index(default_start)
-                    if default_start in start_wallet_options
-                    else 0,
-                    help="Node where your funds currently live.",
-                )
+        start_wallet = st.selectbox(
+            "Starting wallet (exchange:coin)",
+            options=start_wallet_options,
+            index=start_wallet_options.index(default_start)
+            if default_start in start_wallet_options
+            else 0,
+            help="Node where your funds currently live.",
+        )
             else:
                 # For parallel search, we don't need a specific starting wallet
                 start_wallet = (
@@ -565,11 +565,11 @@ def main():
                 )
                 st.info("Parallel search will use 3 random starting points")
 
-            st.markdown("---")
-            st.subheader("Max profitable current trade")
+        st.markdown("---")
+        st.subheader("Max profitable current trade")
 
             # ---- Run button: only run search when clicked ----
-            if st.button("Run search"):
+        if st.button("Run search"):
                 # Create a status container for real-time logging
                 with st.status("Running search...", expanded=True) as status:
                     # Create a code block for real-time log display
@@ -584,20 +584,20 @@ def main():
                     status.update(label="Search completed!", state="complete")
                     st.session_state["best_trade_text"] = result_text
 
-            # Display the last result (or the initial message)
-            st.text(st.session_state["best_trade_text"])
+        # Display the last result (or the initial message)
+        st.text(st.session_state["best_trade_text"])
 
-        with col_graph:
-            st.subheader("Arbitrage Graph")
-            fig = make_graph_figure(G)
-            st.pyplot(fig, use_container_width=True)
+    with col_graph:
+        st.subheader("Arbitrage Graph")
+        fig = make_graph_figure(G)
+        st.pyplot(fig, use_container_width=True)
 
-            st.markdown(
-                """
-                **Edge colours**
+        st.markdown(
+            """
+            **Edge colours**
 
-                • Blue — Trade edge (intra-exchange swap), cost includes taker fee.  
-                • Green — Transfer edge (cross-exchange), cost includes withdrawal fee on the chosen chain.  
+            • Blue — Trade edge (intra-exchange swap), cost includes taker fee.  
+            • Green — Transfer edge (cross-exchange), cost includes withdrawal fee on the chosen chain.  
 
                 Edge costs (negative log of effective rate) are still used internally by A*,
                 but are hidden here to keep the visualization readable.
@@ -854,7 +854,7 @@ These are exactly the fees that are baked into the **green transfer edges** on t
 
 - Remember: this UI is **simulation only**.  
   It does not place real orders or transfers funds.
-"""
+            """
         )
 
 
