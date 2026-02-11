@@ -394,7 +394,7 @@ def simple_1hop_arbitrage(
         for edge in adj.get(start_node, []):
             if (edge.get("kind") == "transfer" and 
                 edge["to"] == target_node and
-                edge.get("coin_from") == start_coin):
+                edge.get("coin") == start_coin):
                 transfer_out_edge = edge
                 break
         
@@ -406,7 +406,7 @@ def simple_1hop_arbitrage(
         for edge in adj.get(target_node, []):
             if (edge.get("kind") == "transfer" and
                 edge["to"] == start_node and
-                edge.get("coin_from") == start_coin):
+                edge.get("coin") == start_coin):
                 transfer_back_edge = edge
                 break
         
@@ -490,7 +490,7 @@ def simple_2hop_arbitrage(
         for edge in adj.get(start_node, []):
             if (edge.get("kind") == "transfer" and 
                 edge["to"] == target_node and
-                edge.get("coin_from") == start_coin):
+                edge.get("coin") == start_coin):
                 transfer_out_edge = edge
                 break
         
@@ -533,7 +533,7 @@ def simple_2hop_arbitrage(
                 for edge in adj.get(target_coin_node, []):
                     if (edge.get("kind") == "transfer" and
                         edge["to"] == final_node_with_new_coin and
-                        edge.get("coin_from") == target_coin):
+                        edge.get("coin") == target_coin):
                         transfer_back_edge = edge
                         break
                 
@@ -573,7 +573,7 @@ def simple_2hop_arbitrage(
                 for edge in adj.get(target_node, []):
                     if (edge.get("kind") == "transfer" and
                         edge["to"] == start_node and
-                        edge.get("coin_from") == start_coin):
+                        edge.get("coin") == start_coin):
                         transfer_back_original = edge
                         break
                 
@@ -608,6 +608,32 @@ def simple_2hop_arbitrage(
         f"path_length={len(best_result.path)}"
     )
     return best_result
+
+
+def two_hop_max_depth_search(
+    start_node: NodeId,
+    liquid_cash_usd: float,
+    max_time_sec: float = 1800.0,
+    min_profit_usd: float = 0.0,
+) -> Optional[PlanResult]:
+    """
+    2-hop max depth baseline: A* with h(n)=0 and max_depth=2.
+    
+    This represents a restricted search that:
+    1. Starts at a node (exchange, coin)
+    2. Can jump to any other node within the same exchange (trade edge)
+    3. From there can jump to any exchange with the same coin (transfer edge)
+    4. That's it (max depth = 2)
+    
+    This is essentially Dijkstra's algorithm (h=0) with a strict 2-hop limit.
+    """
+    return dijkstra_like_search(
+        start_node=start_node,
+        liquid_cash_usd=liquid_cash_usd,
+        max_depth=2,  # Strict 2-hop limit
+        max_time_sec=max_time_sec,
+        min_profit_usd=min_profit_usd,
+    )
 
 
 

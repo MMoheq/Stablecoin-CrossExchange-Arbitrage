@@ -26,10 +26,17 @@ _CACHE_TIMESTAMP: Optional[float] = None
 _CACHE_TTL_SEC: float = 60.0  # Cache graph for 60 seconds
 
 
+# Maximum deviation from $1.00 for a coin to be considered a stablecoin
+# Coins trading outside this range are excluded (e.g., FRAX can trade at $0.80-$0.90)
+STABLECOIN_PRICE_TOLERANCE = 0.05  # 5% tolerance: $0.95 - $1.05
+
+
 def fetch_price_snapshot() -> Tuple[Dict[NodeId, float], float]:
     """
     Fetch a snapshot of USD-normalized prices for all (exchange, coin)
     pairs where we have a configured market in data.py.
+
+    Filters out coins that deviate too far from $1.00 (not true stablecoins).
 
     Returns:
         prices:    dict[(exchange, coin)] -> price_usd
@@ -79,7 +86,7 @@ def _fetch_actual_trading_pair_rate(
     ex_name: str,
     coin_from: str,
     coin_to: str,
-) -> Optional[float]:
+) -> float | None:
     """
     Try to fetch the actual trading pair rate from the exchange.
     Returns the rate (units of coin_to per 1 unit of coin_from) or None if not available.
@@ -121,6 +128,10 @@ def _build_trade_edges(
         kind = "trade"
         rate = effective multiplicative factor on amount
         cost = -log(rate)
+    
+    IMPORTANT: We try to fetch actual trading pair prices first. If not available,
+    we fall back to calculating from normalized USD prices (which may introduce
+    small errors due to normalization path differences).
     """
     adj: Adjacency = defaultdict(list)
 
@@ -178,6 +189,7 @@ def _build_trade_edges(
                         "reference_amount_units": None,
                         "chain": None,
                         "transfer_time_sec": 0.0,
+                        "uses_actual_pair": actual_rate is not None,  # Flag for debugging
                     }
                 )
 

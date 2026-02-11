@@ -32,6 +32,7 @@ from scripts.baseline_algorithms import (
     simple_1hop_arbitrage,
     simple_2hop_arbitrage,
     dijkstra_like_search,
+    two_hop_max_depth_search,
     PlanResult as BaselinePlanResult,
 )
 from scripts.bellman_ford_arbitrage import (
@@ -49,7 +50,7 @@ QUICK_MAX_DEPTH: int = 4          # Reduced from 5 to 4 for faster execution
 QUICK_MAX_TIME_SEC: float = 60.0  # ≈ 1 minute cap per search (best-effort)
 QUICK_NUM_START_NODES: int = 3    # use at most 3 start nodes
 QUICK_NUM_STARTS_H3: int = 2      # parallel random starts for h3
-QUICK_CASH_LEVELS: List[float] = [100.0, 1_000.0, 10_000.0]  # Test multiple portfolio sizes
+QUICK_CASH_LEVELS: List[float] = [10_000.0]  # Only $10,000 portfolio
 MAX_WORKERS: int = 8              # number of parallel threads for running searches
 
 
@@ -82,6 +83,8 @@ def run_single_search(
       - "h2_slippage"   -> astar_best_path_with_liquidity using h2
       - "h4_chaincongestion_exchange_risk" -> weighted_astar_best_path (h4+h5)
       - "h3_parallel"   -> parallel_search_from_random_starts (wrapper over A*)
+      - "dijkstra"      -> dijkstra_like_search (A* with h=0, no heuristic)
+      - "2hop_max"      -> two_hop_max_depth_search (A* with h=0, max_depth=2)
       - "simple_1hop"   -> simple_1hop_arbitrage (naive 1-hop baseline)
       - "simple_2hop"   -> simple_2hop_arbitrage (naive 2-hop baseline)
       - "dijkstra"      -> dijkstra_like_search (A* with h=0, no heuristic)
@@ -177,7 +180,8 @@ def run_single_search(
             raise ValueError(
                 f"Unknown heuristic: {heuristic}. Must be one of "
                 f"'h1_liquidity', 'h2_slippage', 'h3_parallel', "
-                f"'h4_chaincongestion_exchange_risk', 'simple_1hop', 'simple_2hop', 'dijkstra', 'bellman_ford'."
+                f"'h4_chaincongestion_exchange_risk', 'dijkstra', '2hop_max', "
+                f"'simple_1hop', 'simple_2hop', 'bellman_ford'."
             )
 
     except Exception as e:
@@ -294,9 +298,9 @@ def main() -> None:
             for h in ["h1_liquidity", "h2_slippage", "h4_chaincongestion_exchange_risk"]:
                 tasks.append((h, start, cash))
         
-        # Simple baselines: run for each start node
+        # Baseline algorithms: run for each start node
         for start in start_nodes:
-            for h in ["simple_1hop", "simple_2hop", "dijkstra", "bellman_ford"]:
+            for h in ["dijkstra", "2hop_max", "simple_1hop", "simple_2hop"]:
                 tasks.append((h, start, cash))
         
         # h3_parallel: start nodes are chosen inside the function
