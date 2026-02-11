@@ -108,7 +108,8 @@ def test_chain_exchange_risk_heuristic_is_sum_of_parts(monkeypatch):
 def main():
     results_dir = REPO_ROOT / "results"
     results_dir.mkdir(exist_ok=True)
-    out_file = results_dir / "unit_tests_h4.txt"
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    out_file = results_dir / f"unit_tests_h4_{timestamp}.txt"
 
     buf = io.StringIO()
 

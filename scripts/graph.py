@@ -4,7 +4,7 @@ from __future__ import annotations
 import time
 import math
 from collections import defaultdict
-from typing import Dict, Tuple, List, Any
+from typing import Dict, Tuple, List, Any, Optional
 
 # from our own modules
 from scripts.data import EXCHANGES, STABLE_COINS, COIN_MARKETS, normalize_price_to_usd
@@ -15,6 +15,15 @@ from scripts.transfer_time import get_chain_time_seconds
 NodeId = Tuple[str, str]
 
 Adjacency = Dict[NodeId, List[Dict[str, Any]]]
+
+# Maximum deviation from $1.00 for a coin to be considered a stablecoin
+# Coins trading outside this range are excluded (e.g., FRAX can trade at $0.80-$0.90)
+STABLECOIN_PRICE_TOLERANCE = 0.05  # 5% tolerance: $0.95 - $1.05
+
+# Graph caching to avoid rebuilding on every search
+_CACHED_GRAPH: Optional[Tuple[Dict[NodeId, Dict[str, Any]], Adjacency]] = None
+_CACHE_TIMESTAMP: Optional[float] = None
+_CACHE_TTL_SEC: float = 60.0  # Cache graph for 60 seconds
 
 
 # Maximum deviation from $1.00 for a coin to be considered a stablecoin
@@ -82,12 +91,14 @@ def _fetch_actual_trading_pair_rate(
     Try to fetch the actual trading pair rate from the exchange.
     Returns the rate (units of coin_to per 1 unit of coin_from) or None if not available.
     """
-    ex = EXCHANGES[ex_name]
+    ex = EXCHANGES.get(ex_name)
+    if ex is None:
+        return None
     
     # Try both directions
     pairs_to_try = [
         (f"{coin_from}/{coin_to}", False),  # Direct: base=coin_from, quote=coin_to
-        (f"{coin_to}/{coin_from}", True),     # Inverted: base=coin_to, quote=coin_from
+        (f"{coin_to}/{coin_from}", True),   # Inverted: base=coin_to, quote=coin_from
     ]
     
     for pair, needs_invert in pairs_to_try:
@@ -140,7 +151,7 @@ def _build_trade_edges(
                 c_from = coins_here[i]
                 c_to = coins_here[j]
                 
-                # Try to fetch actual trading pair rate first
+                # Try to fetch actual trading pair rate first (more accurate)
                 actual_rate = _fetch_actual_trading_pair_rate(ex_name, c_from, c_to)
                 
                 if actual_rate is not None:
@@ -152,7 +163,7 @@ def _build_trade_edges(
                     p_from = prices[(ex_name, c_from)]  # USD per 1 c_from
                     p_to = prices[(ex_name, c_to)]      # USD per 1 c_to
                     raw_rate = p_from / p_to
-
+                
                 effective_rate = raw_rate * (1.0 - taker_fee)
 
                 if effective_rate <= 0:
@@ -287,9 +298,15 @@ def _build_transfer_edges(
     return adj
 
 
-def build_graph() -> Tuple[Dict[NodeId, Dict[str, Any]], Adjacency]:
+def build_graph(force_refresh: bool = False) -> Tuple[Dict[NodeId, Dict[str, Any]], Adjacency]:
     """
     Build the arbitrage graph.
+    
+    Uses caching to avoid rebuilding the graph on every call. The cache is valid
+    for CACHE_TTL_SEC seconds. Set force_refresh=True to bypass the cache.
+
+    Args:
+        force_refresh: If True, bypass cache and rebuild graph from scratch.
 
     Returns:
         nodes:
@@ -303,6 +320,19 @@ def build_graph() -> Tuple[Dict[NodeId, Dict[str, Any]], Adjacency]:
         adj:
             adjacency list mapping node -> list of edge dicts.
     """
+    global _CACHED_GRAPH, _CACHE_TIMESTAMP
+    
+    # Check cache validity
+    current_time = time.time()
+    if (
+        not force_refresh
+        and _CACHED_GRAPH is not None
+        and _CACHE_TIMESTAMP is not None
+        and (current_time - _CACHE_TIMESTAMP) < _CACHE_TTL_SEC
+    ):
+        return _CACHED_GRAPH
+    
+    # Build fresh graph
     prices, snapshot_ts = fetch_price_snapshot()
 
     # Nodes with metadata (price + snapshot time)
@@ -327,6 +357,10 @@ def build_graph() -> Tuple[Dict[NodeId, Dict[str, Any]], Adjacency]:
         adj[node].extend(edges)
     for node, edges in transfer_adj.items():
         adj[node].extend(edges)
+
+    # Update cache
+    _CACHED_GRAPH = (nodes, adj)
+    _CACHE_TIMESTAMP = current_time
 
     return nodes, adj
 

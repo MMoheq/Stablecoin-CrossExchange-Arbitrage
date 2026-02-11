@@ -46,7 +46,7 @@ PlanLike = AStarPlanResult | WeightedPlanResult | BaselinePlanResult | BellmanFo
 # -------------------------------------------------------------------
 # "Quick experiment" knobs (tuned so it doesn't take an hour)
 # -------------------------------------------------------------------
-QUICK_MAX_DEPTH: int = 5          # shallower search than 6
+QUICK_MAX_DEPTH: int = 4          # Reduced from 5 to 4 for faster execution
 QUICK_MAX_TIME_SEC: float = 60.0  # ≈ 1 minute cap per search (best-effort)
 QUICK_NUM_START_NODES: int = 3    # use at most 3 start nodes
 QUICK_NUM_STARTS_H3: int = 2      # parallel random starts for h3
@@ -87,6 +87,7 @@ def run_single_search(
       - "2hop_max"      -> two_hop_max_depth_search (A* with h=0, max_depth=2)
       - "simple_1hop"   -> simple_1hop_arbitrage (naive 1-hop baseline)
       - "simple_2hop"   -> simple_2hop_arbitrage (naive 2-hop baseline)
+      - "dijkstra"      -> dijkstra_like_search (A* with h=0, no heuristic)
       - "bellman_ford"  -> bellman_ford_arbitrage (negative cycle detection, related research baseline)
     """
     t0 = time.perf_counter()
@@ -116,6 +117,8 @@ def run_single_search(
                 max_time_sec=max_time_sec,
                 min_profit_usd=min_profit_usd,
                 heuristic=heuristic,
+                early_exit_after_profit=True,  # Enable early exit for faster execution
+                early_exit_iterations=100,  # Continue searching for 100 iterations after finding profit
             )
 
         elif heuristic == "h4_chaincongestion_exchange_risk":
@@ -128,6 +131,8 @@ def run_single_search(
                 max_depth=max_depth,
                 max_time_sec=max_time_sec,
                 min_profit_usd=min_profit_usd,
+                early_exit_after_profit=True,  # Enable early exit for faster execution
+                early_exit_iterations=100,  # Continue searching for 100 iterations after finding profit
             )
 
         elif heuristic == "simple_1hop":
@@ -157,16 +162,6 @@ def run_single_search(
                 start_node=start_node,
                 liquid_cash_usd=cash_usd,
                 max_depth=max_depth,
-                max_time_sec=max_time_sec,
-                min_profit_usd=min_profit_usd,
-            )
-
-        elif heuristic == "2hop_max":
-            if start_node is None:
-                raise ValueError("start_node must be provided for 2hop_max")
-            result = two_hop_max_depth_search(
-                start_node=start_node,
-                liquid_cash_usd=cash_usd,
                 max_time_sec=max_time_sec,
                 min_profit_usd=min_profit_usd,
             )
@@ -250,7 +245,10 @@ def main() -> None:
     # Setup output file with incremental writing
     results_dir = project_root / "results"
     results_dir.mkdir(exist_ok=True)
-    out_path = results_dir / "compare_heuristics_live.txt"
+    
+    # Include timestamp in filename to avoid overwriting previous results
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    out_path = results_dir / f"compare_heuristics_live_{timestamp}.txt"
     
     # Thread-safe file writing
     file_lock = threading.Lock()

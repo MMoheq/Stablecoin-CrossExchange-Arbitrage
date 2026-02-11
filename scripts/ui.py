@@ -247,7 +247,7 @@ def run_search_and_format(
 
             result: Optional[PlanResult] = parallel_search_from_random_starts(
                 liquid_cash_usd=liquid_cash,
-                max_depth=6,
+                max_depth=4,  # Reduced from 6 to 4 for faster execution
                 max_time_sec=1800.0,
                 min_profit_usd=0.0,
                 heuristic=base_heuristic,  # Base heuristic for each parallel search
@@ -257,19 +257,19 @@ def run_search_and_format(
         elif heuristic_name == "h4_chain_congestion":
             # Weighted A* with chain + exchange risk heuristic
             result = weighted_astar_best_path(
-                start_node=start_node,
-                liquid_cash_usd=liquid_cash,
-                max_depth=6,
-                max_time_sec=1800.0,
-                min_profit_usd=0.0,
-            )
+            start_node=start_node,
+            liquid_cash_usd=liquid_cash,
+                max_depth=4,  # Reduced from 6 to 4 for faster execution
+            max_time_sec=1800.0,
+            min_profit_usd=0.0,
+        )
 
         else:
             # Standard single-start search for h1 / h2
             result = astar_best_path_with_liquidity(
                 start_node=start_node,
                 liquid_cash_usd=liquid_cash,
-                max_depth=6,
+                max_depth=4,  # Reduced from 6 to 4 for faster execution
                 max_time_sec=1800.0,
                 min_profit_usd=0.0,
                 heuristic=heuristic_name,  # Pass selected heuristic to A*
@@ -565,13 +565,13 @@ def main():
                 )
                 st.info("Parallel search will use 3 random starting points")
 
-            st.markdown("---")
-            st.subheader("Max profitable current trade")
+        st.markdown("---")
+        st.subheader("Max profitable current trade")
 
-            # ---- Run button: only run search when clicked ----
-            if st.button("Run search"):
-                # Create a status container for real-time logging
-                with st.status("Running search...", expanded=True) as status:
+        # ---- Run button: only run search when clicked ----
+        if st.button("Run search"):
+            # Create a status container for real-time logging
+            with st.status("Running search...", expanded=True) as status:
                     # Create a code block for real-time log display
                     log_display = st.empty()
 
@@ -584,20 +584,20 @@ def main():
                     status.update(label="Search completed!", state="complete")
                     st.session_state["best_trade_text"] = result_text
 
-            # Display the last result (or the initial message)
-            st.text(st.session_state["best_trade_text"])
+        # Display the last result (or the initial message)
+        st.text(st.session_state["best_trade_text"])
 
-        with col_graph:
-            st.subheader("Arbitrage Graph")
-            fig = make_graph_figure(G)
-            st.pyplot(fig, use_container_width=True)
+    with col_graph:
+        st.subheader("Arbitrage Graph")
+        fig = make_graph_figure(G)
+        st.pyplot(fig, use_container_width=True)
 
-            st.markdown(
-                """
-                **Edge colours**
+        st.markdown(
+            """
+            **Edge colours**
 
-                • Blue — Trade edge (intra-exchange swap), cost includes taker fee.  
-                • Green — Transfer edge (cross-exchange), cost includes withdrawal fee on the chosen chain.  
+            • Blue — Trade edge (intra-exchange swap), cost includes taker fee.  
+            • Green — Transfer edge (cross-exchange), cost includes withdrawal fee on the chosen chain.  
 
                 Edge costs (negative log of effective rate) are still used internally by A*,
                 but are hidden here to keep the visualization readable.
@@ -854,7 +854,7 @@ These are exactly the fees that are baked into the **green transfer edges** on t
 
 - Remember: this UI is **simulation only**.  
   It does not place real orders or transfers funds.
-"""
+            """
         )
 
 

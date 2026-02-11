@@ -56,7 +56,7 @@ def _final_cash_from_log_cost(initial_cash_usd: float, total_log_cost: float) ->
 def dijkstra_like_search(
     start_node: NodeId,
     liquid_cash_usd: float,
-    max_depth: int = 6,
+    max_depth: int = 4,  # Reduced from 6 to 4 for faster execution
     max_time_sec: float = 1800.0,
     min_profit_usd: float = 0.0,
 ) -> Optional[PlanResult]:
@@ -153,7 +153,7 @@ def dijkstra_like_search(
 def greedy_best_first_search(
     start_node: NodeId,
     liquid_cash_usd: float,
-    max_depth: int = 6,
+    max_depth: int = 4,  # Reduced from 6 to 4 for faster execution
     max_time_sec: float = 1800.0,
     min_profit_usd: float = 0.0,
     heuristic: str = "h1_liquidity",
@@ -271,7 +271,7 @@ def greedy_best_first_search(
 def breadth_first_search(
     start_node: NodeId,
     liquid_cash_usd: float,
-    max_depth: int = 6,
+    max_depth: int = 4,  # Reduced from 6 to 4 for faster execution
     max_time_sec: float = 1800.0,
     min_profit_usd: float = 0.0,
 ) -> Optional[PlanResult]:

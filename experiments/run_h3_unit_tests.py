@@ -169,7 +169,8 @@ def test_parallel_search_respects_num_starts(monkeypatch):
 def main() -> None:
     results_dir = REPO_ROOT / "results"
     results_dir.mkdir(exist_ok=True)
-    out_file = results_dir / "unit_tests_h3.txt"
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    out_file = results_dir / f"unit_tests_h3_{timestamp}.txt"
 
     buf = io.StringIO()
 
