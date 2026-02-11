@@ -19,6 +19,7 @@ This module:
 
 from __future__ import annotations
 
+import time
 from typing import Optional, Tuple
 
 # We reuse the exchange objects and market mappings from data.py
@@ -29,6 +30,10 @@ SLIPPAGE_HEURISTIC_WEIGHT: float = 0.5  # w_slip, can be tuned
 SLIPPAGE_THRESHOLD_BPS: float = 10.0    # 0.10% = acceptable slippage
 UNKNOWN_SLIPPAGE_PENALTY: float = 50.0  # cost if no order book data
 
+# Cache TTL for order book data (30 seconds - order books change more frequently)
+_ORDERBOOK_CACHE_TTL_SEC: float = 30.0
+_orderbook_cache: dict[tuple[str, str], tuple[float, Optional[dict]]] = {}  # (exchange, market) -> (timestamp, orderbook)
+
 
 
 def fetch_order_book(
@@ -38,6 +43,8 @@ def fetch_order_book(
 ) -> Optional[dict]:
     """
     Fetch the order book for a specific symbol on an exchange.
+    
+    Uses caching to avoid repeated API calls for the same market within 30 seconds.
 
     Args:
         exchange_name: "binance", "kraken", "kucoin", "bybit", ...
@@ -48,14 +55,28 @@ def fetch_order_book(
         Order book dict with 'bids' and 'asks' lists, or None if error.
         Each bid/ask is [price, amount].
     """
+    # Check cache first
+    cache_key = (exchange_name, market)
+    current_time = time.time()
+    
+    if cache_key in _orderbook_cache:
+        cached_time, cached_orderbook = _orderbook_cache[cache_key]
+        if (current_time - cached_time) < _ORDERBOOK_CACHE_TTL_SEC:
+            return cached_orderbook
+    
+    # Cache miss or expired - fetch from API
     ex = EXCHANGES.get(exchange_name)
     if ex is None:
         return None
 
     try:
         orderbook = ex.fetch_order_book(market, limit=limit)
+        # Update cache
+        _orderbook_cache[cache_key] = (current_time, orderbook)
         return orderbook
     except Exception:
+        # Cache the failure (None) to avoid repeated failed calls
+        _orderbook_cache[cache_key] = (current_time, None)
         return None
 
 

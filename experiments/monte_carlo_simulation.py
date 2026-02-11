@@ -35,9 +35,13 @@ from scripts.baseline_algorithms import (
     simple_2hop_arbitrage,
     PlanResult as BaselinePlanResult,
 )
+from scripts.bellman_ford_arbitrage import (
+    bellman_ford_arbitrage,
+    PlanResult as BellmanFordPlanResult,
+)
 
-# Both A*, Weighted A*, and baseline algorithms return a PlanResult-like object
-PlanLike = AStarPlanResult | WeightedPlanResult | BaselinePlanResult
+# Both A*, Weighted A*, baseline algorithms, and Bellman-Ford return a PlanResult-like object
+PlanLike = AStarPlanResult | WeightedPlanResult | BaselinePlanResult | BellmanFordPlanResult
 
 # ----------------------------------------------------------------------
 # "Quick" Monte Carlo knobs so it doesn't run forever
@@ -88,6 +92,7 @@ def run_single_search(
       - "h3_parallel"   -> parallel_search_from_random_starts (wrapper over A*)
       - "simple_1hop"   -> simple_1hop_arbitrage (naive 1-hop baseline)
       - "simple_2hop"   -> simple_2hop_arbitrage (naive 2-hop baseline)
+      - "bellman_ford"  -> bellman_ford_arbitrage (negative cycle detection, related research baseline)
     """
     t0 = time.perf_counter()
     error: Optional[str] = None
@@ -149,11 +154,21 @@ def run_single_search(
                 min_profit_usd=min_profit_usd,
             )
 
+        elif heuristic == "bellman_ford":
+            if start_node is None:
+                raise ValueError("start_node must be provided for bellman_ford")
+            result = bellman_ford_arbitrage(
+                start_node=start_node,
+                liquid_cash_usd=cash_usd,
+                max_time_sec=max_time_sec,
+                min_profit_usd=min_profit_usd,
+            )
+
         else:
             raise ValueError(
                 f"Unknown heuristic: {heuristic}. Must be one of "
                 f"'h1_liquidity', 'h2_slippage', 'h4_chaincongestion_exchange_risk', "
-                f"'h3_parallel', 'simple_1hop', 'simple_2hop'."
+                f"'h3_parallel', 'simple_1hop', 'simple_2hop', 'bellman_ford'."
             )
 
     except Exception as e:
@@ -219,7 +234,10 @@ def main():
     # Where to write results
     results_dir = project_root / "results"
     results_dir.mkdir(parents=True, exist_ok=True)
-    out_path = results_dir / "monte_carlo_heuristics.txt"
+    
+    # Include timestamp in filename to avoid overwriting previous results
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    out_path = results_dir / f"monte_carlo_heuristics_{timestamp}.txt"
 
     # Configuration of the simulation (quick mode)
     NUM_TRIALS = MC_NUM_TRIALS
@@ -231,6 +249,7 @@ def main():
         "h3_parallel",
         "simple_1hop",
         "simple_2hop",
+        "bellman_ford",
     ]
 
     all_results: List[MonteCarloResult] = []
@@ -255,7 +274,7 @@ def main():
                 cash = random.choice(CASH_LEVELS)
 
                 if h in ("h1_liquidity", "h2_slippage", "h4_chaincongestion_exchange_risk", 
-                         "simple_1hop", "simple_2hop"):
+                         "simple_1hop", "simple_2hop", "bellman_ford"):
                     start = pick_random_start_node(nodes)
                 else:
                     start = None  # h3_parallel chooses its own starts

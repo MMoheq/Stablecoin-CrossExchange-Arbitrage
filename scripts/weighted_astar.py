@@ -84,9 +84,11 @@ def _compute_chain_weight_from_risk(risk: float) -> float:
 def weighted_astar_best_path(
     start_node: NodeId,
     liquid_cash_usd: float,
-    max_depth: int = 6,
+    max_depth: int = 4,  # Reduced from 6 to 4 for faster execution
     max_time_sec: float = 1800.0,   # 30 minutes by default
     min_profit_usd: float = 0.0,
+    early_exit_after_profit: bool = True,  # Exit early when profitable path found
+    early_exit_iterations: int = 100,  # Continue searching for better paths for N iterations after finding profit
 ) -> Optional[PlanResult]:
     """
     Weighted A* search over the arbitrage graph that:
@@ -158,6 +160,8 @@ def weighted_astar_best_path(
     best_g_seen: Dict[Tuple[NodeId, int], float] = {(start_node, 0): start_g}
 
     best_result: Optional[PlanResult] = None
+    iterations_since_profit = 0
+    found_profit = False
 
     while frontier:
         f_score, g_score, _, state, path_nodes, path_edges = heapq.heappop(frontier)
@@ -179,11 +183,29 @@ def weighted_astar_best_path(
                         final_cash_usd=final_cash,
                         profit_usd=profit,
                     )
+                    found_profit = True
+                    iterations_since_profit = 0  # Reset counter when we find a better path
                     logger.info(
                         "New best path found (Weighted A* h4+h5): "
                         f"profit=${profit:.2f}, path_length={len(path_nodes)}, "
                         f"path={' -> '.join(f'{ex}:{c}' for (ex, c) in path_nodes)}"
                     )
+                else:
+                    # Found a profit but not better than current best
+                    if found_profit:
+                        iterations_since_profit += 1
+            else:
+                # No profit found, increment counter if we previously found profit
+                if found_profit:
+                    iterations_since_profit += 1
+        
+        # Early exit: if we found a profitable path and searched enough iterations without improvement
+        if early_exit_after_profit and found_profit and iterations_since_profit >= early_exit_iterations:
+            logger.info(
+                f"Early exit: Found profitable path and searched {iterations_since_profit} iterations "
+                f"without improvement. Returning best result."
+            )
+            break
 
         # Stop expanding if depth/time limits reached
         if state.depth >= max_depth or state.elapsed_sec >= max_time_sec:

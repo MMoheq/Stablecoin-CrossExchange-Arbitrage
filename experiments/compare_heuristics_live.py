@@ -31,20 +31,26 @@ from scripts.weighted_astar import (
 from scripts.baseline_algorithms import (
     simple_1hop_arbitrage,
     simple_2hop_arbitrage,
+    dijkstra_like_search,
+    two_hop_max_depth_search,
     PlanResult as BaselinePlanResult,
 )
+from scripts.bellman_ford_arbitrage import (
+    bellman_ford_arbitrage,
+    PlanResult as BellmanFordPlanResult,
+)
 
-# Result from either classic A*, weighted A*, or baseline algorithms
-PlanLike = AStarPlanResult | WeightedPlanResult | BaselinePlanResult
+# Result from either classic A*, weighted A*, baseline algorithms, or Bellman-Ford
+PlanLike = AStarPlanResult | WeightedPlanResult | BaselinePlanResult | BellmanFordPlanResult
 
 # -------------------------------------------------------------------
 # "Quick experiment" knobs (tuned so it doesn't take an hour)
 # -------------------------------------------------------------------
-QUICK_MAX_DEPTH: int = 5          # shallower search than 6
+QUICK_MAX_DEPTH: int = 4          # Reduced from 5 to 4 for faster execution
 QUICK_MAX_TIME_SEC: float = 60.0  # ≈ 1 minute cap per search (best-effort)
 QUICK_NUM_START_NODES: int = 3    # use at most 3 start nodes
 QUICK_NUM_STARTS_H3: int = 2      # parallel random starts for h3
-QUICK_CASH_LEVELS: List[float] = [1_000.0, 10_000.0, 100_000.0]
+QUICK_CASH_LEVELS: List[float] = [100.0, 1_000.0, 10_000.0]  # Test multiple portfolio sizes
 MAX_WORKERS: int = 8              # number of parallel threads for running searches
 
 
@@ -77,8 +83,12 @@ def run_single_search(
       - "h2_slippage"   -> astar_best_path_with_liquidity using h2
       - "h4_chaincongestion_exchange_risk" -> weighted_astar_best_path (h4+h5)
       - "h3_parallel"   -> parallel_search_from_random_starts (wrapper over A*)
+      - "dijkstra"      -> dijkstra_like_search (A* with h=0, no heuristic)
+      - "2hop_max"      -> two_hop_max_depth_search (A* with h=0, max_depth=2)
       - "simple_1hop"   -> simple_1hop_arbitrage (naive 1-hop baseline)
       - "simple_2hop"   -> simple_2hop_arbitrage (naive 2-hop baseline)
+      - "dijkstra"      -> dijkstra_like_search (A* with h=0, no heuristic)
+      - "bellman_ford"  -> bellman_ford_arbitrage (negative cycle detection, related research baseline)
     """
     t0 = time.perf_counter()
     error: Optional[str] = None
@@ -107,6 +117,8 @@ def run_single_search(
                 max_time_sec=max_time_sec,
                 min_profit_usd=min_profit_usd,
                 heuristic=heuristic,
+                early_exit_after_profit=True,  # Enable early exit for faster execution
+                early_exit_iterations=100,  # Continue searching for 100 iterations after finding profit
             )
 
         elif heuristic == "h4_chaincongestion_exchange_risk":
@@ -119,6 +131,8 @@ def run_single_search(
                 max_depth=max_depth,
                 max_time_sec=max_time_sec,
                 min_profit_usd=min_profit_usd,
+                early_exit_after_profit=True,  # Enable early exit for faster execution
+                early_exit_iterations=100,  # Continue searching for 100 iterations after finding profit
             )
 
         elif heuristic == "simple_1hop":
@@ -141,11 +155,43 @@ def run_single_search(
                 min_profit_usd=min_profit_usd,
             )
 
+        elif heuristic == "dijkstra":
+            if start_node is None:
+                raise ValueError("start_node must be provided for dijkstra")
+            result = dijkstra_like_search(
+                start_node=start_node,
+                liquid_cash_usd=cash_usd,
+                max_depth=max_depth,
+                max_time_sec=max_time_sec,
+                min_profit_usd=min_profit_usd,
+            )
+
+        elif heuristic == "2hop_max":
+            if start_node is None:
+                raise ValueError("start_node must be provided for 2hop_max")
+            result = two_hop_max_depth_search(
+                start_node=start_node,
+                liquid_cash_usd=cash_usd,
+                max_time_sec=max_time_sec,
+                min_profit_usd=min_profit_usd,
+            )
+
+        elif heuristic == "bellman_ford":
+            if start_node is None:
+                raise ValueError("start_node must be provided for bellman_ford")
+            result = bellman_ford_arbitrage(
+                start_node=start_node,
+                liquid_cash_usd=cash_usd,
+                max_time_sec=max_time_sec,
+                min_profit_usd=min_profit_usd,
+            )
+
         else:
             raise ValueError(
                 f"Unknown heuristic: {heuristic}. Must be one of "
                 f"'h1_liquidity', 'h2_slippage', 'h3_parallel', "
-                f"'h4_chaincongestion_exchange_risk', 'simple_1hop', 'simple_2hop'."
+                f"'h4_chaincongestion_exchange_risk', 'dijkstra', '2hop_max', "
+                f"'simple_1hop', 'simple_2hop', 'bellman_ford'."
             )
 
     except Exception as e:
@@ -209,7 +255,10 @@ def main() -> None:
     # Setup output file with incremental writing
     results_dir = project_root / "results"
     results_dir.mkdir(exist_ok=True)
-    out_path = results_dir / "compare_heuristics_live.txt"
+    
+    # Include timestamp in filename to avoid overwriting previous results
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    out_path = results_dir / f"compare_heuristics_live_{timestamp}.txt"
     
     # Thread-safe file writing
     file_lock = threading.Lock()
@@ -259,9 +308,9 @@ def main() -> None:
             for h in ["h1_liquidity", "h2_slippage", "h4_chaincongestion_exchange_risk"]:
                 tasks.append((h, start, cash))
         
-        # Simple baselines: run for each start node
+        # Baseline algorithms: run for each start node
         for start in start_nodes:
-            for h in ["simple_1hop", "simple_2hop"]:
+            for h in ["dijkstra", "2hop_max", "simple_1hop", "simple_2hop"]:
                 tasks.append((h, start, cash))
         
         # h3_parallel: start nodes are chosen inside the function

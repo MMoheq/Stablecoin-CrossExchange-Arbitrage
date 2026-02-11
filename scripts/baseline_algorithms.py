@@ -7,6 +7,13 @@ These algorithms serve as baselines for comparison against heuristic-guided A* s
 - breadth_first_search: Explores all paths up to depth limit
 - simple_1hop_arbitrage: Direct transfer cycle between two exchanges (same coin)
 - simple_2hop_arbitrage: Transfer A→B, trade on B, transfer back to A
+
+Related Research Baseline:
+- bellman_ford_arbitrage: Bellman-Ford algorithm for negative cycle detection
+  (see scripts/bellman_ford_arbitrage.py and docs/RELATED_RESEARCH.md)
+  This implements the methodology from Oantă & Coroiu (2023) for theoretical
+  arbitrage detection, serving as a baseline that shows what's theoretically
+  possible vs. what's executable with our execution-aware A* approach.
 """
 
 from __future__ import annotations
@@ -49,7 +56,7 @@ def _final_cash_from_log_cost(initial_cash_usd: float, total_log_cost: float) ->
 def dijkstra_like_search(
     start_node: NodeId,
     liquid_cash_usd: float,
-    max_depth: int = 6,
+    max_depth: int = 4,  # Reduced from 6 to 4 for faster execution
     max_time_sec: float = 1800.0,
     min_profit_usd: float = 0.0,
 ) -> Optional[PlanResult]:
@@ -146,7 +153,7 @@ def dijkstra_like_search(
 def greedy_best_first_search(
     start_node: NodeId,
     liquid_cash_usd: float,
-    max_depth: int = 6,
+    max_depth: int = 4,  # Reduced from 6 to 4 for faster execution
     max_time_sec: float = 1800.0,
     min_profit_usd: float = 0.0,
     heuristic: str = "h1_liquidity",
@@ -264,7 +271,7 @@ def greedy_best_first_search(
 def breadth_first_search(
     start_node: NodeId,
     liquid_cash_usd: float,
-    max_depth: int = 6,
+    max_depth: int = 4,  # Reduced from 6 to 4 for faster execution
     max_time_sec: float = 1800.0,
     min_profit_usd: float = 0.0,
 ) -> Optional[PlanResult]:
@@ -387,7 +394,7 @@ def simple_1hop_arbitrage(
         for edge in adj.get(start_node, []):
             if (edge.get("kind") == "transfer" and 
                 edge["to"] == target_node and
-                edge.get("coin_from") == start_coin):
+                edge.get("coin") == start_coin):
                 transfer_out_edge = edge
                 break
         
@@ -399,7 +406,7 @@ def simple_1hop_arbitrage(
         for edge in adj.get(target_node, []):
             if (edge.get("kind") == "transfer" and
                 edge["to"] == start_node and
-                edge.get("coin_from") == start_coin):
+                edge.get("coin") == start_coin):
                 transfer_back_edge = edge
                 break
         
@@ -483,7 +490,7 @@ def simple_2hop_arbitrage(
         for edge in adj.get(start_node, []):
             if (edge.get("kind") == "transfer" and 
                 edge["to"] == target_node and
-                edge.get("coin_from") == start_coin):
+                edge.get("coin") == start_coin):
                 transfer_out_edge = edge
                 break
         
@@ -526,7 +533,7 @@ def simple_2hop_arbitrage(
                 for edge in adj.get(target_coin_node, []):
                     if (edge.get("kind") == "transfer" and
                         edge["to"] == final_node_with_new_coin and
-                        edge.get("coin_from") == target_coin):
+                        edge.get("coin") == target_coin):
                         transfer_back_edge = edge
                         break
                 
@@ -566,7 +573,7 @@ def simple_2hop_arbitrage(
                 for edge in adj.get(target_node, []):
                     if (edge.get("kind") == "transfer" and
                         edge["to"] == start_node and
-                        edge.get("coin_from") == start_coin):
+                        edge.get("coin") == start_coin):
                         transfer_back_original = edge
                         break
                 
@@ -601,6 +608,32 @@ def simple_2hop_arbitrage(
         f"path_length={len(best_result.path)}"
     )
     return best_result
+
+
+def two_hop_max_depth_search(
+    start_node: NodeId,
+    liquid_cash_usd: float,
+    max_time_sec: float = 1800.0,
+    min_profit_usd: float = 0.0,
+) -> Optional[PlanResult]:
+    """
+    2-hop max depth baseline: A* with h(n)=0 and max_depth=2.
+    
+    This represents a restricted search that:
+    1. Starts at a node (exchange, coin)
+    2. Can jump to any other node within the same exchange (trade edge)
+    3. From there can jump to any exchange with the same coin (transfer edge)
+    4. That's it (max depth = 2)
+    
+    This is essentially Dijkstra's algorithm (h=0) with a strict 2-hop limit.
+    """
+    return dijkstra_like_search(
+        start_node=start_node,
+        liquid_cash_usd=liquid_cash_usd,
+        max_depth=2,  # Strict 2-hop limit
+        max_time_sec=max_time_sec,
+        min_profit_usd=min_profit_usd,
+    )
 
 
 
