@@ -49,7 +49,7 @@ QUICK_MAX_DEPTH: int = 4          # Reduced from 5 to 4 for faster execution
 QUICK_MAX_TIME_SEC: float = 60.0  # ≈ 1 minute cap per search (best-effort)
 QUICK_NUM_START_NODES: int = 3    # use at most 3 start nodes
 QUICK_NUM_STARTS_H3: int = 2      # parallel random starts for h3
-QUICK_CASH_LEVELS: List[float] = [100.0]  # Low risk portfolio test
+QUICK_CASH_LEVELS: List[float] = [100.0, 1_000.0, 10_000.0]  # Test multiple portfolio sizes
 MAX_WORKERS: int = 8              # number of parallel threads for running searches
 
 
