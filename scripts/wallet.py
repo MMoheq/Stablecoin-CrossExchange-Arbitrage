@@ -15,6 +15,8 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
+import json
+from typing import Dict, Any
 
 # NodeId = (exchange_name, coin)
 NodeId = Tuple[str, str]
@@ -46,7 +48,8 @@ def _get_trade_symbol_and_side(
         # Check if this symbol is the one we use for either coin on this exchange
         m_from = coin_markets.get(coin_from, {}).get(exchange_name)
         m_to = coin_markets.get(coin_to, {}).get(exchange_name)
-        if m_from == symbol or m_to == symbol:
+        _match = lambda m, s: s in m if isinstance(m, list) else m == s
+        if _match(m_from, symbol) or _match(m_to, symbol):
             if base_coin == coin_to and quote_coin == coin_from:
                 return (symbol, "buy")   # buy base (coin_to) with quote (coin_from)
             if base_coin == coin_from and quote_coin == coin_to:
@@ -73,7 +76,7 @@ class StepResult:
     side: Optional[str] = None             # "buy" | "sell" for trade
     amount_in: float = 0.0
     amount_out: float = 0.0
-    order_id: Optional[str] = None
+    order_id: Optional[str] = None # Optional means could be a string, or if nothing is assigned, it will assume None. 
     withdraw_id: Optional[str] = None
     error: Optional[str] = None
     dry_run: bool = False
@@ -135,7 +138,7 @@ class PathExecutor:
 
         plan must have .path and .edges (e.g. PlanResult from astar_vol or weighted_astar).
         """
-        path = getattr(plan, "path", None)
+        path = getattr(plan, "path", None) # tries to get the path from the plan, and if not possible, then it will return none.
         edges = getattr(plan, "edges", None)
         if not path or not edges or len(path) != len(edges) + 1:
             return ExecutionResult(
@@ -483,3 +486,42 @@ def create_authenticated_exchanges(
             "options": cfg.get("options", {}),
         })
     return out
+
+# ---------------------------------------------------------------------------
+# Load exchanges from a json file
+# should be in this format
+# {
+#     "binance": {
+#         "apiKey": "your_binance_api_key",
+#         "secret": "your_binance_secret",
+#         "options": {"defaultType": "future"} 
+#     },
+#     "kraken": {
+#         "apiKey": "your_kraken_api_key",
+#         "secret": "your_kraken_secret",
+#         "password": "your_kraken_password" 
+#     }
+# }
+
+
+def load_exchange_config(filepath: str) -> Dict[str, Dict[str, Any]]:
+    """
+    Reads exchange API keys and secrets from a JSON file 
+    and returns them as a nested dictionary.
+    """
+    try:
+        with open(filepath, 'r') as file:
+            config_dict = json.load(file)
+            return config_dict
+            
+    except FileNotFoundError:
+        print(f"Error: The configuration file '{filepath}' was not found.")
+        return {}
+    except json.JSONDecodeError:
+        print(f"Error: The file '{filepath}' contains invalid JSON formatting.")
+        return {}
+
+# --- Example (only when run as script) ---
+# if __name__ == "__main__":
+#     config = load_exchange_config("cfg.json")  # or config.json
+#     exchanges = create_authenticated_exchanges(config)
